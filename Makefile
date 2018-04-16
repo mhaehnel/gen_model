@@ -22,6 +22,8 @@ DISABLED_CLASSES_is=E
 DISABLED_CLASSES_ua=E
 #Not compiling with gfortran
 DISABLED_CLASSES_cg=E
+#gfortran segfaults
+DISABLED_CLASSES_lu=D E
 
 
 $(foreach b,$(BENCHES),$(eval CLASSES_$(b)=$(filter-out $(DISABLED_CLASSES_$(b)),$(CLASSES))))
