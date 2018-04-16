@@ -29,14 +29,15 @@ $(foreach b,$(BENCHES),$(eval CLASSES_$(b)=$(filter-out $(DISABLED_CLASSES_$(b))
 all: $(BENCHES)
 
 define bench_submake =
-  [ ! -f $(NPB_BINDIR)/$(1).$(2)$(NPB_BIN_EXT) ] && \
-  echo "Building $(NPB_BINDIR)/$(1).$(2)$(NPB_BIN_EXT)" && \
-  $$(MAKE) --no-print-directory -C $(NPB_VDIR) $(1) CLASS=$(2) >/dev/null;
+  [ -f $(NPB_BINDIR)/$(1).$(2)$(NPB_BIN_EXT) ] || ( \
+    echo "Building $(NPB_BINDIR)/$(1).$(2)$(NPB_BIN_EXT)" && \
+    $$(MAKE) -C $(NPB_VDIR) $(1) CLASS=$(2) >/dev/null\
+  ) &&
 endef
 
 define bench-rule =
   $1: $(NPB_DIR)
-	@$(foreach c,$(CLASSES_$(1)),$(call bench_submake,$1,$(c)))
+	@$(foreach c,$(CLASSES_$(1)),$(call bench_submake,$1,$(c))) true
 endef
 
 $(foreach b,$(BENCHES),$(eval $(call bench-rule,$(b))))
