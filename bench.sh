@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 
 # Global Variables
-FREQ_STEPS=6
-CPU_STEPS=2
+FREQ_STEPS=${FREQ_STEPS:-6}
+CPU_STEPS=${CPU_STEPS:-2}
 
 #Either 
 # 'distance' (tries to even out distance between frequencies)
 # 'stepwise' (tries to even out distance between steps)
-FREQ_STEP_MODE=distance
+FREQ_STEP_MODE=${FREQ_STEP_MODE:-distance}
 
-BINDIR="NPB3.3.1/NPB3.3-OMP/bin"
+BINDIR=${BIN_DIR:-"NPB3.3.1/NPB3.3-OMP/bin"}
 
-RATE_MS=500
+RATE_MS=${RATE_MS:-500}
 
 
 # Check requirements for this script to work
