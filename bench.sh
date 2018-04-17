@@ -15,9 +15,10 @@ RATE_MS=${RATE_MS:-500}
 
 
 # Check requirements for this script to work
-#command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit 1; }
+command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit 1; }
 command -v perf >/dev/null 2>&1 || { echo >&2 "'perf' has to be installed"; exit 1; }
 perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf support to read RAPL counters"; exit 1; }
+[ $FREQ_STEPS -ge 2 ] || { echo >&2 "Must use at least 2 frequency steps (current: FREQ_STEPS=$FREQ_STEPS)"; exit 1; }
 
 #Command to reverse arrays
 arr_reverse() { declare ARR="$1[@]"; declare -ga $1="( `printf '%s\n' "${!ARR}" | tac` )"; }
