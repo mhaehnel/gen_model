@@ -15,11 +15,11 @@ command -v perf >/dev/null 2>&1 || { echo >&2 "'perf' has to be installed"; exit
 perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf support to read RAPL counters"; exit 1; }
 
 # Setup the script's internals
-min_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
-max_freq=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
-cpu_gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-nr_cpus=$(cat /proc/cpuinfo | grep "cpu cores" | head -n1 | cut -d: -f2 | sed 's/ //g')
-nr_hts=$(cat /proc/cpuinfo | grep "siblings" | head -n1 | cut -d: -f2 | sed 's/ //g')
+min_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
+max_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
+cpu_gov=$(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+nr_cpus=$(grep "cpu cores" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
+nr_hts=$(grep "siblings" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
 
 freq_step=$((($max_freq - $min_freq)/($FREQ_STEPS - 1)))
 freq=$min_freq
