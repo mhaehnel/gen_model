@@ -115,6 +115,9 @@ case $answer in
         ;;
 esac
 
+# Fully abort the script upon CTRL-C
+trap "echo Aborting!; exit 0;" SIGINT SIGTERM
+
 echo -ne "\nStart benchmarking\n"
 for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
     echo -n "$bench: "
