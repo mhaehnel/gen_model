@@ -69,7 +69,7 @@ for l in lines:
     values[-1][name] = value
 
 
-columns = ["bench", "ht", "cpus", "freq"] + list(values[0].keys())
+columns = list(values[0].keys())
 needs_header = True
 out = sys.stdout
 
