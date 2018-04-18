@@ -1,19 +1,36 @@
 #!/usr/bin/env bash
 
-# Global Variables
+## Global Variables
+# Number of different frequencies that should be tested
 FREQ_STEPS=${FREQ_STEPS:-6}
+
+# Number of different cpu counts that should be tested
 CPU_STEPS=${CPU_STEPS:-2}
 
-#Either
+# Which technique should be used to generate the tested frequencies
+# Possible values are:
 # 'distance' (tries to even out distance between frequencies)
 # 'stepwise' (tries to even out distance between steps)
 FREQ_STEP_MODE=${FREQ_STEP_MODE:-distance}
 
-BINDIR=${BIN_DIR:-"NPB3.3.1/NPB3.3-OMP/bin"}
-
+# The rate at which perf should report the counter values (measurement granularity)
 RATE_MS=${RATE_MS:-500}
 
+# The logfile for the output of elab
 ELAB_LOG=${ELAB_LOG:-/dev/null}
+
+# The directory where the intermediate output files of perf should be saved
+PERF_DIR=${PERFDIR:-perf_csv}
+
+# The file where the final CSV output should be saved to
+CSV=${CSV:-bench.csv}
+
+# The directories where the script and the benchmark files are located
+BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
+BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
+
+
+## Main
 
 # Check requirements for this script to work
 command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit 1; }
@@ -141,7 +158,7 @@ echo -ne "\nStart benchmarking\n"
 for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
     echo -n "$bench: "
 
-    bin="$BINDIR/${bench}.x"
+    bin="$BENCH_DIR/${bench}.x"
     perfout=$(mktemp ${bench}.XXXX.csv)
 
     for ht in enable disable; do
