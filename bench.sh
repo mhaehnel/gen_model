@@ -4,7 +4,7 @@
 FREQ_STEPS=${FREQ_STEPS:-6}
 CPU_STEPS=${CPU_STEPS:-2}
 
-#Either 
+#Either
 # 'distance' (tries to even out distance between frequencies)
 # 'stepwise' (tries to even out distance between steps)
 FREQ_STEP_MODE=${FREQ_STEP_MODE:-distance}
@@ -22,7 +22,7 @@ perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf s
 
 #Command to reverse arrays
 arr_reverse() { declare ARR="$1[@]"; declare -ga $1="( `printf '%s\n' "${!ARR}" | tac` )"; }
- 
+
 # Setup the script's internals
 min_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
 max_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
