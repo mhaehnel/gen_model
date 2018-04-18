@@ -13,6 +13,7 @@ BINDIR=${BIN_DIR:-"NPB3.3.1/NPB3.3-OMP/bin"}
 
 RATE_MS=${RATE_MS:-500}
 
+ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # Check requirements for this script to work
 command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit 1; }
@@ -118,6 +119,8 @@ esac
 # Fully abort the script upon CTRL-C
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 
+exec 3<> $ELAB_LOG
+
 echo -ne "\nStart benchmarking\n"
 for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
     echo -n "$bench: "
@@ -130,7 +133,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
             echo -n "H"
         fi
 
-        elab ht $ht
+        elab ht $ht >&3
 
         for cpu in $cpus; do
             echo -n " $cpu"
@@ -138,7 +141,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
             for freq in ${freqs[@]}; do
                 echo -n "@$(($freq/1000))"
 
-                elab frequency $(($freq/1000))
+                elab frequency $(($freq/1000)) >&3
 
                 if [ $ht == disable ]; then
                     taskset_cpus="0-$(($cpu-1))"
