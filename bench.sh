@@ -146,7 +146,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
                 fi
                 #remove avx_insts.all for now. Unsupported(?) on our skylake
-                taskset -c $taskset_cpus perf stat -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout $bin >/dev/null
+                taskset -c $taskset_cpus perf stat -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout --append $bin >/dev/null
             done
         done
     done
