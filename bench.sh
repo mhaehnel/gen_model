@@ -36,6 +36,21 @@ nr_hts=$(grep "siblings" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
 [ $CPU_STEPS -ge 2 ] || { echo >&2 "Must use at least 2 CPU steps (current: CPU_STEPS=$CPU_STEPS)"; exit 1; }
 [ $CPU_STEPS -le $nr_cpus ] || { echo >&2 "Must use less CPU steps than available CPUs (current: CPU_STEPS=$CPU_STEPS, CPUs=$nr_cpus)"; exit 1; }
 
+# Check that we have enough permissions to make system-wide perf measurements.
+# To be able to do this we need CAP_SYS_ADMIN or perf need to be setup properly.
+if [ $EUID != 0 ]; then
+    # Not running as root is OK if perf_paranoid is set to -1
+    if [ $(< /proc/sys/kernel/perf_event_paranoid) -ne -1 ]; then
+        cat >&2 << EOF
+Need to be able to monitor system-wide perf events!
+Possible fixes:
+  - run script as root
+  - echo -1 > /proc/sys/kernel/perf_event_paranoid to allow all users to monitor system-wide pref events
+EOF
+        exit 1;
+    fi
+fi
+
 arr_reverse all_freqs
 
 declare -a freqs
@@ -150,7 +165,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
                 fi
                 #remove avx_insts.all for now. Unsupported(?) on our skylake
-                taskset -c $taskset_cpus perf stat -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout --append $bin >/dev/null
+                taskset -c $taskset_cpus perf stat -a -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout --append $bin >/dev/null
             done
         done
     done
