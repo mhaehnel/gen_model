@@ -120,7 +120,7 @@ esac
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 
 exec 3<> $ELAB_LOG
-elab frequency userpsace >&3
+elab frequency userspace >&3
 
 echo -ne "\nStart benchmarking\n"
 for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
