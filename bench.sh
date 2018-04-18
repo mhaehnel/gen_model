@@ -151,6 +151,8 @@ esac
 # Fully abort the script upon CTRL-C
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 
+mkdir -p $PERF_DIR
+
 exec 3<> $ELAB_LOG
 elab frequency userspace >&3
 
@@ -159,7 +161,6 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
     echo -n "$bench: "
 
     bin="$BENCH_DIR/${bench}.x"
-    perfout=$(mktemp ${bench}.XXXX.csv)
 
     for ht in enable disable; do
         if [ $ht == enable ]; then
@@ -176,13 +177,18 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 elab frequency $(($freq/1000)) >&3
 
+                perfout="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.$(date +%Y_%m_%d-%H_%M_%S).perf.csv"
+
                 if [ $ht == disable ]; then
                     taskset_cpus="0-$(($cpu-1))"
                 else
                     taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
                 fi
                 #remove avx_insts.all for now. Unsupported(?) on our skylake
-                taskset -c $taskset_cpus perf stat -a -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout --append $bin >/dev/null
+                taskset -c $taskset_cpus perf stat -a -e cpu-cycles,instructions,cache-misses,cache-references,power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perfout $bin >/dev/null
+
+                # We are done with the benchmark -- parse the perf output file and delete it
+                $BASE_DIR/parse_csv.py $bench $ht $cpu $freq $perfout -o $CSV --append
             done
         done
     done
