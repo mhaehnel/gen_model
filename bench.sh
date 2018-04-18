@@ -20,7 +20,7 @@ RATE_MS=${RATE_MS:-500}
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # The directory where the intermediate output files of perf should be saved
-PERF_DIR=${PERFDIR:-perf_csv}
+PERF_DIR=${PERF_DIR:-perf_csv}
 
 # The file where the final CSV output should be saved to
 CSV=${CSV:-bench.csv}
