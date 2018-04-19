@@ -30,6 +30,11 @@ BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
 BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 
 
+## Helper functions
+# Command to reverse arrays
+arr_reverse() { declare ARR="$1[@]"; declare -ga $1="( `printf '%s\n' "${!ARR}" | tac` )"; }
+
+
 ## Main
 
 # Check requirements for this script to work
@@ -37,8 +42,6 @@ command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit
 command -v perf >/dev/null 2>&1 || { echo >&2 "'perf' has to be installed"; exit 1; }
 perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf support to read RAPL counters"; exit 1; }
 
-#Command to reverse arrays
-arr_reverse() { declare ARR="$1[@]"; declare -ga $1="( `printf '%s\n' "${!ARR}" | tac` )"; }
 
 # Setup the script's internals
 min_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
