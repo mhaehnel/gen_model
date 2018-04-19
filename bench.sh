@@ -42,6 +42,18 @@ command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit
 command -v perf >/dev/null 2>&1 || { echo >&2 "'perf' has to be installed"; exit 1; }
 perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf support to read RAPL counters"; exit 1; }
 
+if [ $(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver) != "acpi-cpufreq" ]; then
+    if [ $(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver) == "intel_pstate" ]; then
+        cat >&2 << EOF
+Currently running intel_pstate cpu scaling driver! Need to use the acpi-cpufreq cpu scaling driver!
+Possible fixes:
+  - disable intel_pstate driver via commandline (intel_pstate=disable)
+EOF
+    else
+        echo "Running a not-supported cpu scaling driver! Need to use acpi-cpufreq cpu scaling driver!"
+    fi
+    exit 1
+fi
 
 # Setup the script's internals
 min_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
