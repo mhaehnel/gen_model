@@ -148,6 +148,7 @@ Using the following steps:
 CPUs ($CPU_STEPS steps): $cpus
 Frequencies ($FREQ_STEPS steps): ${freqs[@]}
 
+Measurement rate: $RATE_MS ms
 EOF
 
 read -en1 -p "Continue? [Y/n] " answer
