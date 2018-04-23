@@ -11,13 +11,30 @@ def output_headers(headers, sep, outfile):
 def output_row(values, headers, sep, outfile):
     print(sep.join([str(values[h]) for h in headers]), file=outfile)
 
+class MatchError(RuntimeError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+def find_perf_counter(values, last_best, current_ts, max_diff):
+    # Check if the one we used last time is still close enough
+    if abs(values[last_best]["ts"] - current_ts) < max_diff:
+        return last_best
+
+    # Otherwise search starting from the last one another value that fits better
+    for i in range(last_best+1, len(values)):
+        if abs(values[i]["ts"] - current_ts) < max_diff:
+            return i
+
+    raise MatchError("Can't find performance counter match for energy value: {}".format(current_ts))
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("bench", action="store", help="the benchmark name")
 parser.add_argument("ht", action="store", help="the hyperthreading mode")
 parser.add_argument("cpus", action="store", help="the number of cpus used")
 parser.add_argument("freq", action="store", help="the frequency used")
-parser.add_argument("csv", action="store", help="the perf csv-like file")
+parser.add_argument("ctrcsv", action="store", help="the perf csv-like file containing the counters")
+parser.add_argument("energycsv", action="store", help="the perf csv-like file containing the energy")
 parser.add_argument("-o", "--outfile", action="store", default=None, help="save csv output to this file")
 parser.add_argument("--sep", action="store", default=";", help="use this separator (default: ;)")
 parser.add_argument("--append", action="store_true", default=False, help="append if the output file already exists")
@@ -28,24 +45,34 @@ bench = args.bench
 ht = args.ht
 cpus = args.cpus
 freq = args.freq
-perfcsv = args.csv
+ctr_csv = args.ctrcsv
+energy_csv = args.energycsv
 
 outfile = args.outfile
 sep = args.sep
 append = args.append
 
 try:
-    with open(perfcsv) as perffile:
-        lines = perffile.read().splitlines()
+    with open(ctr_csv) as perffile:
+        ctr_lines = perffile.read().splitlines()
 except IOError:
-    print("Can't open perf csv-file", file=sys.stderr)
+    print("Can't open counter perf csv-file", file=sys.stderr)
     sys.exit(1)
 
-# Parse the data from the perf csv-file
+try:
+    with open(energy_csv) as perffile:
+        energy_lines = perffile.read().splitlines()
+except IOError:
+    print("Can't open energy perf csv-file", file=sys.stderr)
+    sys.exit(1)
+
+
+# Parse the data from the perf csv-files
 values = []
 last_ts = None
 
-for l in lines:
+# First read in the performance counter values
+for l in ctr_lines:
     if l.startswith("#"):
         # Skip the first line
         continue
@@ -68,7 +95,34 @@ for l in lines:
 
     values[-1][name] = value
 
+# Next read in the RAPL counter values and try to match them with the performance counters
+MAX_DIFF=0.002      # The maximum difference in the time stamps to still be counted equal (seconds)
+last_val = 0
 
+for l in energy_lines:
+    if l.startswith("#"):
+        # Skip the first line
+        continue
+
+    if len(l) == 0:
+        # Skip empty lines
+        continue
+
+    eles = l.split(";")
+    ts = float(eles[0].strip())
+    name = eles[3]
+    value = eles[1].strip()
+
+    try:
+        last_val = find_perf_counter(values, last_val, ts, MAX_DIFF)
+    except MatchError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
+    values[last_val][name] = value
+
+
+# Done parsing, create the output
 columns = list(values[0].keys())
 needs_header = True
 out = sys.stdout
