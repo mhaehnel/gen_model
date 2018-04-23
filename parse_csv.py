@@ -9,7 +9,14 @@ def output_headers(headers, sep, outfile):
     print(sep.join(headers), file=outfile)
 
 def output_row(values, headers, sep, outfile):
-    print(sep.join([str(values[h]) for h in headers]), file=outfile)
+    vals = []
+    for h in headers:
+        if h in values:
+            vals.append(str(values[h]))
+        else:
+            vals.append('')
+
+    print(sep.join(vals), file=outfile)
 
 class MatchError(RuntimeError):
     def __init__(self, *args, **kwargs):
