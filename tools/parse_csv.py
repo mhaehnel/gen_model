@@ -77,7 +77,7 @@ except IOError:
 # Parse the data from the perf csv-files
 values = []
 last_ts = None
-
+err_names = []
 # First read in the performance counter values
 for l in ctr_lines:
     if l.startswith("#"):
@@ -97,8 +97,14 @@ for l in ctr_lines:
         values.append({ "ts" : ts, "t_diff" : ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
         last_ts = ts
     elif ts != last_ts:
+        if err_names:
+            print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
+            err_names = []
+            values[:-1]
         values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
         last_ts = ts
+    if value == "<not counted>":
+        err_names.append(name)
 
     values[-1][name] = value
 
