@@ -16,3 +16,6 @@ export CSV="${CSV:-${BASE_DIR}/bench_data.csv}"
 export RATE_MS=${RATE_MS:-1000}
 
 $BASE_DIR/tools/bench.sh
+
+# Generate the models
+Rscript "${BASE_DIR}/tools/analysis.R" $CSV
