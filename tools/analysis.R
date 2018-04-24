@@ -110,6 +110,7 @@ bench <- within(bench, {
 
 print_eqn(sm_IPC)
 print_eqn(sm_power)
+colors = c("green","yellow","white","magenta","red")
 for (b in c("bt.A", "cg.B", "dc.A", "ep.B", "ft.C", "is.C", "lu.B", "mg.C", "sp.B", "ua.A")) {
     cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds=c(0.02,0.05,0.1,0.2,1.0),colors,FALSE),"\n")
 }
