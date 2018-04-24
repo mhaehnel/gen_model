@@ -22,4 +22,6 @@ export RATE_MS=${RATE_MS:-1000}
 $BASE_DIR/tools/bench.sh || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
 
 # Generate the models
+export R_LIBS_USER=~/.local/lib64/R/library
+mkdir -p ${R_LIBS_USER}
 Rscript "${BASE_DIR}/tools/analysis.R" $CSV
