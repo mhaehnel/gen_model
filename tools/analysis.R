@@ -69,10 +69,10 @@ solve_eqn <- function(sum,...) {
 # Main
 args = commandArgs(trailingOnly=TRUE)
 if (length(args) == 0) {
-    args[0] = "bench.csv"
+    args[1] = "bench.csv"
 }
 
-bench <- read_delim(args[0], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols())
+bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols())
 
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
