@@ -13,11 +13,11 @@ colorprint <- function(val, thresholds, colors, greater = TRUE) {
     stopifnot(length(thresholds)==length(colors))
     for (i in 1:length(colors)) {
         if (greater) {
-            if (val > thresholds[i]) {
+            if (!is.nan(val) && val > thresholds[i]) {
                 return(style(toString(val),colors[i]))
             }
         } else {
-            if (val < thresholds[i]) {
+            if (!is.nan(val) && val < thresholds[i]) {
                 return(style(toString(val),colors[i]))
             }
         }
