@@ -88,23 +88,23 @@ bench <- within(bench, {
 m_IPC <- lm(IPC ~ memory_heaviness +
                 poly(cache_heaviness,2,raw=TRUE) +
                 poly(compute_heaviness,2,raw=TRUE) +
-                frequency +
+                freq +
                 ht,
             data=bench)
 sm_IPC <- summary(m_IPC)
 
 m_power <- lm(`power-pkg` ~ IPC +
-                frequency +
-                poly(cores,2,raw=TRUE) +
+                freq +
+                poly(cpus,2,raw=TRUE) +
                 ht,
             data=bench)
 sm_power <- summary(m_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC,memoryHeaviness = memoryHeaviness, cacheHeaviness = cacheHeaviness, ht = ht, avxHeaviness = avxHeaviness, frequency = frequency,computeHeaviness = computeHeaviness)
+    IPC_modeled <- solve_eqn(sm_IPC,memory_heaviness = memory_heaviness, cache_heaviness = cache_heaviness, ht = ht, freq = freq, compute_heaviness = compute_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, frequency = frequency, IPC = IPC_modeled, cores = cores, ht = ht)
+    power_modeled <- solve_eqn(sm_power, freq = freq, IPC = IPC_modeled, cpus = cpus, ht = ht)
     power_abserr_rel <- abs(power_modeled - `power-pkg`) / `power-pkg`
 })
 
