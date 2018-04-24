@@ -71,8 +71,7 @@ args = commandArgs(trailingOnly=TRUE)
 if (length(args) == 0) {
     args[1] = "bench.csv"
 }
-
-bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols())
+bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cache-misses`="d",`cpu-cycles`="d",`cache-references`="d",instructions="d"))
 
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
