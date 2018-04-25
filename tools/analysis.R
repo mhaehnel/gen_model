@@ -81,27 +81,28 @@ bench <- within(bench, {
     `cache-hits` <- `cache-events` - `memory-events`
 
     # calculate the heaviness of the applications
-    `memory-heaviness` <- `memory-events`/instructions
-    `cache-heaviness` <- `cache-hits`/instructions
-    `avx-heaviness` <- `avx-events`/instructions
-    `compute-heaviness` <- (instructions - `cache-hits` - `memory-events` - `avx-events`)/instructions
+    memory_heaviness <- `memory-events`/instructions
+    cache_heaviness <- `cache-hits`/instructions
+    avx_heaviness <- `avx-events`/instructions
+    compute_heaviness <- (instructions - `cache-hits` - `memory-events` - `avx-events`)/instructions
 
     # calculate the power consumption
-    `power-ram` <- `power/energy-ram/`/`t_diff`
-    `power-cores` <- `power/energy-cores/`/`t_diff`
-    `power-pkg` <- `power/energy-pkg/`/`t_diff`
+    power_ram <- `power/energy-ram/`/`t_diff`
+    power_cores <- `power/energy-cores/`/`t_diff`
+    power_pkg <- `power/energy-pkg/`/`t_diff`
 })
 
-m_IPC <- lm(IPC ~ `memory-heaviness` +
-                poly(`cache-heaviness`,2,raw=TRUE) +
-                poly(`compute-heaviness`,2,raw=TRUE) +
+m_IPC <- lm(IPC ~ memory_heaviness +
+                poly(cache_heaviness,2,raw=TRUE) +
+                poly(compute_heaviness,2,raw=TRUE) +
+                poly(avx_heaviness,2,raw=TRUE) +
                 freq +
                 ht,
             data=bench)
 sm_IPC <- summary(m_IPC)
 
-m_power <- lm(`power-pkg` ~ IPC +
-                freq +
+m_power <- lm(`power_pkg` ~ poly(IPC,2,raw=TRUE) +
+                poly(freq,2,raw=TRUE) +
                 poly(cpus,2,raw=TRUE) +
                 ht,
             data=bench)
@@ -109,17 +110,20 @@ sm_power <- summary(m_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC, `memory-heaviness` = `memory-heaviness`, `cache-heaviness` = `cache-heaviness`, ht = ht, freq = freq, `compute-heaviness` = `compute-heaviness`)
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, freq = freq, IPC = IPC_modeled, cpus = cpus, ht = ht)
-    power_abserr_rel <- abs(power_modeled - `power-pkg`) / `power-pkg`
+    power_modeled <- solve_eqn(sm_power, freq=freq, IPC=IPC_modeled, cpus=cpus, ht=ht)
+    power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
 })
 
 print_eqn(sm_IPC)
 print_eqn(sm_power)
+
 colors = c("green","yellow","white","magenta","red")
+thresholds=c(0.02,0.05,0.1,0.2,1.0)
+
 for (b in c("bt.A", "cg.B", "dc.A", "ep.B", "ft.C", "is.C", "lu.B", "mg.C", "sp.B", "ua.A")) {
-    cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds=c(0.02,0.05,0.1,0.2,1.0),colors,FALSE),"\n")
+    cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
 }
-cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds=c(0.02,0.05,0.1,0.2,1.0),colors,FALSE),"\n")
-cat("MAPE Power: ",colorprint(mean(bench$power_abserr_rel),thresholds=c(0.02,0.05,0.1,0.2,1.0),colors,FALSE),"\n")
+cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
+cat("MAPE Power: ",colorprint(mean(bench$power_abserr_rel),thresholds,colors,FALSE),"\n")
