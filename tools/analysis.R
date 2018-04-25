@@ -89,6 +89,10 @@ bench <- within(bench, {
     ht <- ifelse(ht == "enable", 1, 0)
     cpus <- ifelse(ht == 1, cpus*2, cpus)
 
+    #Try to deal with Turbo. However, this does not work reliably. Turbo is too complex ATM to deal with
+    turbo <- ifelse(bitwAnd(freq/1000,1)==1,1,0)
+    freq <- ifelse(bitwAnd(freq/1000,1)==1,freq-1000,freq)
+
     # 'cache-events' counts everything that contains the cache, but we are only interested in cache hits
     `cache-hits` <- `cache-events` - `memory-events`
 
@@ -116,6 +120,7 @@ sm_IPC <- summary(m_IPC)
 m_power <- lm(power_pkg ~ IPC +
                 poly(freq,2,raw=TRUE) +
                 poly(cpus,2,raw=TRUE) +
+                freq + #turbo +
                 ht,
             data=bench)
 sm_power <- summary(m_power)
@@ -124,7 +129,7 @@ sm_power <- summary(m_power)
 bench <- within(bench, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus)
+    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus, turbo=turbo)
     power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
 })
 
