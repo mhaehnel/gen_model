@@ -11,17 +11,22 @@ for (p in required.packages) {
 # Helper functions
 colorprint <- function(val, thresholds, colors, greater = TRUE) {
     stopifnot(length(thresholds)==length(colors))
+    if (is.na(val) || is.nan(val) || is.infinite(val))
+        return(style(toString(val),"red"))
+
     for (i in 1:length(colors)) {
         if (greater) {
-            if (!is.nan(val) && val > thresholds[i]) {
+            if (val > thresholds[i]) {
                 return(style(toString(val),colors[i]))
             }
         } else {
-            if (!is.nan(val) && val < thresholds[i]) {
+            if (val < thresholds[i]) {
                 return(style(toString(val),colors[i]))
             }
         }
     }
+
+    # We are outside of the defined thresholds
     return(val)
 }
 
