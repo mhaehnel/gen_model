@@ -29,6 +29,10 @@ CSV=${CSV:-bench.csv}
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
 BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 
+# The additional events that we must count
+CACHE_EVENT=${E_CACHE:-cache-references}
+MEMORY_EVENT=${E_MEMORY:-cache-misses}
+AVX_EVENT=${E_AVX:-cpu/event=0xC7,umask=0x2D/u}
 
 ## Helper functions
 # Command to reverse arrays
@@ -201,11 +205,16 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                 else
                     taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
                 fi
-                #remove avx_insts.all for now. Unsupported(?) on our skylake
+
                 taskset -c $taskset_cpus \
                     perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perf_energy_out \
-                    perf stat -e cpu-cycles,instructions,cache-misses,cache-references -I $RATE_MS -x \; -o $perf_counter_out \
+                    perf stat -e cpu-cycles,instructions,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o $perf_counter_out \
                     $bin >/dev/null
+
+                # rename the cache, memory and avx events to stable predefined names
+                sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
+                sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
+                sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
 
                 # We are done with the benchmark -- parse the perf output file and delete it
                 $BASE_DIR/parse_csv.py $bench $ht $cpu $freq $perf_counter_out $perf_energy_out -o $CSV --append
