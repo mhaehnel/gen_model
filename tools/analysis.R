@@ -116,9 +116,9 @@ sm_power <- summary(m_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness)
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, freq=freq, IPC=IPC_modeled, cpus=cpus, ht=ht)
+    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, cpus=cpus, ht=ht)
     power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
 })
 
