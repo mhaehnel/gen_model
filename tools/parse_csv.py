@@ -100,7 +100,7 @@ for l in ctr_lines:
         if err_names:
             print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
             err_names = []
-            values[:-1]
+            values = values[:-1]
         values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
         last_ts = ts
     if value == "<not counted>":
