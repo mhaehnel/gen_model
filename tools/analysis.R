@@ -71,7 +71,7 @@ args = commandArgs(trailingOnly=TRUE)
 if (length(args) == 0) {
     args[1] = "bench.csv"
 }
-bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cache-misses`="d",`cpu-cycles`="d",`cache-references`="d",instructions="d"))
+bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cpu-cycles`="d", instructions="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
@@ -92,9 +92,9 @@ bench <- within(bench, {
     `power-pkg` <- `power/energy-pkg/`/`t_diff`
 })
 
-m_IPC <- lm(IPC ~ memory-heaviness +
-                poly(cache-heaviness,2,raw=TRUE) +
-                poly(compute-heaviness,2,raw=TRUE) +
+m_IPC <- lm(IPC ~ `memory-heaviness` +
+                poly(`cache-heaviness`,2,raw=TRUE) +
+                poly(`compute-heaviness`,2,raw=TRUE) +
                 freq +
                 ht,
             data=bench)
@@ -109,7 +109,7 @@ sm_power <- summary(m_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC, memory-heaviness = memory-heaviness, cache-heaviness = cache-heaviness, ht = ht, freq = freq, compute-heaviness = compute-heaviness)
+    IPC_modeled <- solve_eqn(sm_IPC, `memory-heaviness` = `memory-heaviness`, `cache-heaviness` = `cache-heaviness`, ht = ht, freq = freq, `compute-heaviness` = `compute-heaviness`)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
     power_modeled <- solve_eqn(sm_power, freq = freq, IPC = IPC_modeled, cpus = cpus, ht = ht)
     power_abserr_rel <- abs(power_modeled - `power-pkg`) / `power-pkg`
