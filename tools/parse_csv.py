@@ -130,6 +130,7 @@ for l in energy_lines:
         last_val = find_perf_counter(values, last_val, ts, MAX_DIFF)
     except MatchError as e:
         print(str(e), file=sys.stderr)
+        continue
 
     values[last_val][name] = value
 
