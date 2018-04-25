@@ -59,9 +59,15 @@ solve_eqn <- function(sum,...) {
         for (prod in strsplit(r,":")[[1]]) {
             if (substr(prod,1,4) == "poly") {
                 elem <- strsplit(sub("poly\\(([^,]+), [^\\)]+\\)([0-9]*)","\\1,\\2",prod, perl=TRUE),",")[[1]]
-                curval <- curval * (list(...)[[elem[1]]] ^ as.numeric(elem[2]))
+                if (elem[[1]] %in% names(list(...)))
+                    curval <- curval * (list(...)[[elem[1]]] ^ as.numeric(elem[2]))
+                else
+                    cat("Missing argument to solve_eqn: ", elem[[1]], "\n")
             } else {
-                curval <- curval * list(...)[[prod]]
+                if (prod %in% names(list(...)))
+                    curval <- curval * list(...)[[prod]]
+                else
+                    cat("Missing argument to solve_eqn: ", prod, "\n")
             }
         }
         tot_sum <- tot_sum + curval
@@ -118,7 +124,7 @@ sm_power <- summary(m_power)
 bench <- within(bench, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, cpus=cpus, ht=ht)
+    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus)
     power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
 })
 
