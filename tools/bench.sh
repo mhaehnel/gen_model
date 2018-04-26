@@ -32,7 +32,7 @@ BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 # The additional events that we must count
 CACHE_EVENT=${E_CACHE:-cache-references}
 MEMORY_EVENT=${E_MEMORY:-cache-misses}
-AVX_EVENT=${E_AVX:-cpu/event=0xC7,umask=0x2D/u}
+AVX_EVENT=${E_AVX:-cpu/event=0xC7,umask=0x3C/u}
 
 ## Helper functions
 # Command to reverse arrays
