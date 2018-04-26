@@ -22,9 +22,9 @@ class MatchError(RuntimeError):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-def find_perf_counter(values, last_best, current_ts, max_diff):
+def find_perf_counter(values, last_best, current_ts, max_diff, force_next=False):
     # Check if the one we used last time is still close enough
-    if abs(values[last_best]["ts"] - current_ts) < max_diff:
+    if not force_next and abs(values[last_best]["ts"] - current_ts) < max_diff:
         return last_best
 
     # Otherwise search starting from the last one another value that fits better
@@ -133,7 +133,11 @@ for l in energy_lines:
         continue
 
     if name in values[last_val]:
-        print("WARNING: going to overwrite energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
+        # Try if the next performance counter value might fit as well
+        try:
+            last_val = find_perf_counter(values, last_val, ts, MAX_DIFF, True)
+        except MatchError as e:
+            print("WARNING: going to overwrite energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
 
     values[last_val][name] = value
 
