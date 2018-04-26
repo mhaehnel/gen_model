@@ -197,6 +197,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 elab frequency $(($freq/1000)) >&3
 
+                perf_counter_out_tmp="$(mktemp)"
                 perf_counter_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.$(date +%Y_%m_%d-%H_%M_%S).ctr.csv"
                 perf_energy_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.$(date +%Y_%m_%d-%H_%M_%S).energy.csv"
 
@@ -207,9 +208,11 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                 fi
 
                 taskset -c $taskset_cpus \
-                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o $perf_energy_out \
-                    perf stat -e cpu-cycles,instructions,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o $perf_counter_out \
+                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
+                    perf stat -e cpu-cycles,instructions,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     $bin >/dev/null
+
+                mv "$perf_counter_out_tmp" "$perf_counter_out"
 
                 # rename the cache, memory and avx events to stable predefined names
                 sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
