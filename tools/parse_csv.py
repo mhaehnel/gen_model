@@ -109,7 +109,7 @@ for l in ctr_lines:
     values[-1][name] = value
 
 # Next read in the RAPL counter values and try to match them with the performance counters
-MAX_DIFF=0.02      # The maximum difference in the time stamps to still be counted equal (seconds)
+MAX_DIFF = 0.02      # The maximum difference in the time stamps to still be counted equal (seconds)
 last_val = 0
 
 for l in energy_lines:
@@ -131,6 +131,9 @@ for l in energy_lines:
     except MatchError as e:
         print(str(e), file=sys.stderr)
         continue
+
+    if name in values[last_val]:
+        print("WARNING: going to overwrite energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
 
     values[last_val][name] = value
 
