@@ -87,7 +87,6 @@ bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_type
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
     ht <- ifelse(ht == "enable", 1, 0)
-    cpus <- ifelse(ht == 1, cpus*2, cpus)
 
     # 'cache-events' counts everything that contains the cache, but we are only interested in cache hits
     `cache-hits` <- `cache-events` - `memory-events`

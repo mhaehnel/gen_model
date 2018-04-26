@@ -203,8 +203,10 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 if [ $ht == disable ]; then
                     taskset_cpus="0-$(($cpu-1))"
+                    c=$cpu
                 else
                     taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
+                    c=$(($cpu*2))
                 fi
 
                 taskset -c $taskset_cpus \
@@ -219,8 +221,8 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                 sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
                 sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
 
-                # We are done with the benchmark -- parse the perf output file and delete it
-                $BASE_DIR/parse_csv.py $bench $ht $cpu $freq $perf_counter_out $perf_energy_out -o $CSV --append
+                # We are done with the benchmark -- parse the perf output file
+                $BASE_DIR/parse_csv.py $bench $ht $c $freq $perf_counter_out $perf_energy_out -o $CSV --append
             done
         done
     done
