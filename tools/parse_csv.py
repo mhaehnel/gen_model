@@ -124,7 +124,7 @@ for l in energy_lines:
     eles = l.split(";")
     ts = float(eles[0].strip())
     name = eles[3]
-    value = eles[1].strip()
+    value = float(eles[1].strip())
 
     try:
         last_val = find_perf_counter(values, last_val, ts, MAX_DIFF)
@@ -137,9 +137,10 @@ for l in energy_lines:
         try:
             last_val = find_perf_counter(values, last_val, ts, MAX_DIFF, True)
         except MatchError as e:
-            print("WARNING: going to overwrite energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
-
-    values[last_val][name] = value
+            print("WARNING: summing up duplicate energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
+            values[last_val][name] += value
+    else:
+        values[last_val][name] = value
 
 
 # Done parsing, create the output
