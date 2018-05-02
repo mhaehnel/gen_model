@@ -30,6 +30,10 @@ BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
 BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 
 # The additional events that we must count
+INSTR_EVENT=${E_INSTR:-cpu/event=0x00,umask=0x1/u}
+CYCLE_EVENT=${E_CYCLE:-cpu/event=0x00,umask=0x2/u}
+CYCLE_REF_EVENT=${E_CYCLE_REF:-cpu/event=0x00,umask=0x3/u}
+BRANCH_EVENT=${E_BRANCH:-cpu/event=0xC4,umask=0x0/u}
 CACHE_EVENT=${E_CACHE:-cache-references}
 MEMORY_EVENT=${E_MEMORY:-cache-misses}
 AVX_EVENT=${E_AVX:-cpu/event=0xC7,umask=0x3C/u}
@@ -211,12 +215,16 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 taskset -c $taskset_cpus \
                     perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
-                    perf stat -e cpu-cycles,instructions,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
+                    perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     $bin >/dev/null
 
                 mv "$perf_counter_out_tmp" "$perf_counter_out"
 
-                # rename the cache, memory and avx events to stable predefined names
+                # rename the events to predefined names
+                sed -i "s#${INSTR_EVENT}#instructions#g" $perf_counter_out
+                sed -i "s#${CYCLE_EVENT}#cpu-cycles#g" $perf_counter_out
+                sed -i "s#${CYCLE_REF_EVENT}#cpu-cycles-ref#g" $perf_counter_out
+                sed -i "s#${BRANCH_EVENT}#branch-events#g" $perf_counter_out
                 sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
                 sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
                 sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
