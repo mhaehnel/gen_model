@@ -212,7 +212,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     c=$(($cpu*2))
                 fi
 
-                if [ $ht == disable]
+                if [ $ht == disable]; then
                     elab ht disable >&3
                 fi
 
@@ -221,7 +221,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     $bin >/dev/null
 
-                if [ $ht == disable]
+                if [ $ht == disable]; then
                     elab ht enable >&3
                 fi
 
