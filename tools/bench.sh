@@ -30,9 +30,9 @@ BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
 BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 
 # The additional events that we must count
-INSTR_EVENT=${E_INSTR:-cpu/event=0x00,umask=0x1/u}
-CYCLE_EVENT=${E_CYCLE:-cpu/event=0x00,umask=0x2/u}
-CYCLE_REF_EVENT=${E_CYCLE_REF:-cpu/event=0x00,umask=0x3/u}
+INSTR_EVENT=${E_INSTR:-instructions}
+CYCLE_EVENT=${E_CYCLE:-cpu-cycles}
+CYCLE_REF_EVENT=${E_CYCLE_REF:-ref-cycles}
 BRANCH_EVENT=${E_BRANCH:-cpu/event=0xC4,umask=0x0/u}
 CACHE_EVENT=${E_CACHE:-cache-references}
 MEMORY_EVENT=${E_MEMORY:-cache-misses}
