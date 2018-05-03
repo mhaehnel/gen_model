@@ -95,7 +95,8 @@ bench <- within(bench, {
     memory_heaviness <- `memory-events`/instructions
     cache_heaviness <- `cache-hits`/instructions
     avx_heaviness <- `avx-events`/instructions
-    compute_heaviness <- (instructions - `cache-hits` - `memory-events` - `avx-events`)/instructions
+    branch_heaviness <- `branch-events`/instructions
+    compute_heaviness <- (instructions - `cache-hits` - `memory-events` - `avx-events` - `branch-events`)/instructions
 
     # calculate the power consumption
     power_ram <- `power/energy-ram/`/`t_diff`
