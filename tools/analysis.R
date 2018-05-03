@@ -104,18 +104,20 @@ bench <- within(bench, {
     power_pkg <- `power/energy-pkg/`/`t_diff`
 })
 
-m_IPC <- lm(IPC ~ memory_heaviness +
+m_IPC <- lm(IPC ~
+                poly(memory_heaviness,3,raw=TRUE) +
                 poly(cache_heaviness,3,raw=TRUE) +
-                poly(compute_heaviness,2,raw=TRUE) +
-                poly(avx_heaviness,2,raw=TRUE) +
+                poly(compute_heaviness,3,raw=TRUE) +
+                poly(avx_heaviness,3,raw=TRUE) +
                 freq +
                 ht,
             data=bench)
 sm_IPC <- summary(m_IPC)
 
-m_power <- lm(power_pkg ~ IPC +
-                poly(freq,2,raw=TRUE) +
-                poly(cpus,2,raw=TRUE) +
+m_power <- lm(power_pkg ~
+                poly(IPC,3,raw=TRUE) +
+                poly(freq,3,raw=TRUE) +
+                poly(cpus,3,raw=TRUE) +
                 ht,
             data=bench)
 sm_power <- summary(m_power)
