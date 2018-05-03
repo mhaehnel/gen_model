@@ -115,7 +115,6 @@ sm_IPC <- summary(m_IPC)
 m_power <- lm(power_pkg ~ IPC +
                 poly(freq,2,raw=TRUE) +
                 poly(cpus,2,raw=TRUE) +
-                freq +
                 ht,
             data=bench)
 sm_power <- summary(m_power)
