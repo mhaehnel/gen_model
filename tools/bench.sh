@@ -178,6 +178,7 @@ trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 mkdir -p $PERF_DIR
 
 exec 3<> $ELAB_LOG
+elab ht enable >&3
 elab frequency userspace >&3
 
 echo -ne "\nStart benchmarking\n"
@@ -190,8 +191,6 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
         if [ $ht == enable ]; then
             echo -n "H"
         fi
-
-        elab ht $ht >&3
 
         for cpu in $cpus; do
             echo -n " $cpu"
@@ -213,10 +212,18 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     c=$(($cpu*2))
                 fi
 
+                if [ $ht == disable]
+                    elab ht disable >&3
+                fi
+
                 taskset -c $taskset_cpus \
                     perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
                     perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     $bin >/dev/null
+
+                if [ $ht == disable]
+                    elab ht enable >&3
+                fi
 
                 mv "$perf_counter_out_tmp" "$perf_counter_out"
 
