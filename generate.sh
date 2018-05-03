@@ -10,9 +10,13 @@ command -v make >/dev/null 2>&1 || { echo >&2 "'make' has to be installed"; exit
 command -v Rscript >/dev/null 2>&1 || { echo >&2 "'R' has to be installed"; exit 1; }
 
 # Download the benchmarks and build them
+echo "Download and build benchmarks"
+
 make -C "${BASE_DIR}/benchmarks" || { echo >&2 "Something went wrong when building the benchmarks"; exit 1; }
 
 # Measure all the necessary data
+echo "Run benchmarks"
+
 export BENCH_DIR="${BASE_DIR}/benchmarks/NPB3.3.1/NPB3.3-OMP/bin"
 
 export PERF_DIR="${PERF_DIR:-${BASE_DIR}/perf_data}"
@@ -22,6 +26,8 @@ export RATE_MS=${RATE_MS:-1000}
 $BASE_DIR/tools/bench.sh || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
 
 # Generate the models
+echo "Generate models"
+
 export R_LIBS_USER=~/.local/lib64/R/library
 mkdir -p ${R_LIBS_USER}
 Rscript "${BASE_DIR}/tools/analysis.R" $CSV
