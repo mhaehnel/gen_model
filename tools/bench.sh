@@ -16,6 +16,9 @@ FREQ_STEP_MODE=${FREQ_STEP_MODE:-distance}
 # The rate at which perf should report the counter values (measurement granularity)
 RATE_MS=${RATE_MS:-500}
 
+# The minimum runtime each benchmark should be executed at each configuration in seconds
+MIN_RUNTIME=${MIN_RUNTIME:-80}
+
 # The logfile for the output of elab
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
@@ -200,44 +203,52 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 elab frequency $(($freq/1000)) >&3
 
-                perf_counter_out_tmp="$(mktemp)"
-                perf_counter_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.$(date +%Y_%m_%d-%H_%M_%S).ctr.csv"
-                perf_energy_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.$(date +%Y_%m_%d-%H_%M_%S).energy.csv"
-
-                if [ $ht == disable ]; then
-                    taskset_cpus="0-$(($cpu-1))"
-                    c=$cpu
-                else
-                    taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
-                    c=$(($cpu*2))
-                fi
-
                 if [ $ht == disable ]; then
                     elab ht disable >&3
                 fi
 
-                taskset -c $taskset_cpus \
-                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
-                    perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
-                    $bin >/dev/null
+                file_ts=$(date +%Y_%m_%d-%H_%M_%S)
+                start_ts=$(date +%s)
+                iter=1
+
+                while (($(date +%s) - $start_ts < $MIN_RUNTIME)); do
+                    perf_counter_out_tmp="$(mktemp)"
+                    perf_counter_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
+                    perf_energy_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
+
+                    if [ $ht == disable ]; then
+                        taskset_cpus="0-$(($cpu-1))"
+                        c=$cpu
+                    else
+                        taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
+                        c=$(($cpu*2))
+                    fi
+
+                    taskset -c $taskset_cpus \
+                        perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
+                        perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
+                        $bin >/dev/null
+
+                    mv "$perf_counter_out_tmp" "$perf_counter_out"
+
+                    # rename the events to predefined names
+                    sed -i "s#${INSTR_EVENT}#instructions#g" $perf_counter_out
+                    sed -i "s#${CYCLE_EVENT}#cpu-cycles#g" $perf_counter_out
+                    sed -i "s#${CYCLE_REF_EVENT}#cpu-cycles-ref#g" $perf_counter_out
+                    sed -i "s#${BRANCH_EVENT}#branch-events#g" $perf_counter_out
+                    sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
+                    sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
+                    sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
+
+                    # We are done with the benchmark -- parse the perf output file
+                    $BASE_DIR/parse_csv.py $bench $ht $c $freq $perf_counter_out $perf_energy_out -o $CSV --append
+
+                    iter=$(($iter + 1))
+                done
 
                 if [ $ht == disable ]; then
                     elab ht enable >&3
                 fi
-
-                mv "$perf_counter_out_tmp" "$perf_counter_out"
-
-                # rename the events to predefined names
-                sed -i "s#${INSTR_EVENT}#instructions#g" $perf_counter_out
-                sed -i "s#${CYCLE_EVENT}#cpu-cycles#g" $perf_counter_out
-                sed -i "s#${CYCLE_REF_EVENT}#cpu-cycles-ref#g" $perf_counter_out
-                sed -i "s#${BRANCH_EVENT}#branch-events#g" $perf_counter_out
-                sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
-                sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
-                sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
-
-                # We are done with the benchmark -- parse the perf output file
-                $BASE_DIR/parse_csv.py $bench $ht $c $freq $perf_counter_out $perf_energy_out -o $CSV --append
             done
         done
     done
