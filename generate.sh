@@ -22,8 +22,9 @@ export BENCH_DIR="${BASE_DIR}/benchmarks/NPB3.3.1/NPB3.3-OMP/bin"
 export PERF_DIR="${PERF_DIR:-${BASE_DIR}/perf_data}"
 export CSV="${CSV:-${BASE_DIR}/bench_data.csv}"
 export RATE_MS=${RATE_MS:-1000}
+BENCH_ERROR_LOG=${BENCH_ERROR_LOG:-bench.log}
 
-$BASE_DIR/tools/bench.sh || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
+$BASE_DIR/tools/bench.sh 2>$BENCH_ERROR_LOG || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
 
 # Generate the models
 echo "Generate models"
