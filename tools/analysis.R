@@ -84,6 +84,15 @@ if (length(args) == 0) {
 }
 bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
+# Select benches from environment variable 'BENCHES' if applicable
+benches <- Sys.getenv("BENCHES",names=TRUE,unset=NA)
+if (!is.na(benches)) {
+    benches <- unlist(strsplit(benches,","))
+    bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'",benches),collapse=","),")"))
+} else {
+    benches <- unlist(sqldf("SELECT DISTINCT bench FROM bench")["bench"])
+}
+
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
     ht <- ifelse(ht == "enable", 1, 0)
@@ -113,6 +122,7 @@ m_IPC <- lm(IPC ~
                 ht,
             data=bench)
 sm_IPC <- summary(m_IPC)
+print(sm_IPC)
 
 m_power <- lm(power_pkg ~
                 poly(IPC,3,raw=TRUE) +
@@ -121,6 +131,7 @@ m_power <- lm(power_pkg ~
                 ht,
             data=bench)
 sm_power <- summary(m_power)
+print(sm_power)
 
 #Solve it
 bench <- within(bench, {
@@ -136,7 +147,7 @@ print_eqn(sm_power)
 colors = c("green","yellow","white","magenta","red")
 thresholds=c(0.02,0.05,0.1,0.2,1.0)
 
-for (b in c("bt.A", "cg.B", "dc.A", "ep.B", "ft.C", "is.C", "lu.B", "mg.C", "sp.B", "ua.A")) {
+for (b in benches) {
     cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
 }
 cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
