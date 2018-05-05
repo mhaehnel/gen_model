@@ -152,3 +152,5 @@ for (b in benches) {
 }
 cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
 cat("MAPE Power: ",colorprint(mean(bench$power_abserr_rel),thresholds,colors,FALSE),"\n")
+
+write.csv(bench, "r_data.csv")
