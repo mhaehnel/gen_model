@@ -86,12 +86,19 @@ bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_type
 
 # Select benches from environment variable 'BENCHES' if applicable
 benches <- Sys.getenv("BENCHES",names=TRUE,unset=NA)
+benches_exclude <- Sys.getenv("BENCHES_EXCLUDE",names=TRUE,unset=NA)
 if (!is.na(benches)) {
     benches <- unlist(strsplit(benches,","))
-    bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'",benches),collapse=","),")"))
 } else {
     benches <- unlist(sqldf("SELECT DISTINCT bench FROM bench")["bench"])
 }
+
+if (!is.na(benches_exclude)) {
+    benches <- setdiff(benches,unlist(strsplit(benches_exclude,",")))
+}
+
+bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'",benches),collapse=","),")"))
+
 
 bench <- within(bench, {
     IPC <- instructions/`cpu-cycles`
