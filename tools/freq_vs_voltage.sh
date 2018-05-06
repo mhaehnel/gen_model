@@ -7,5 +7,4 @@ for f in `cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
 	elab frequency $(($f/1000)) >/dev/null
 	sleep 2
     echo "$(($(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq)/1000)),$(< /sys/class/hwmon/hwmon2/in0_input)"
-    elab frequency
 done 
