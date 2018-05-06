@@ -84,6 +84,15 @@ if (length(args) == 0) {
 }
 bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
+prefilter <- Sys.getenv("PREFILTER",unset=NA)
+if (!is.na(prefilter)) {
+    pre <- NROW(bench)
+    cat("Filtering data\n")
+    bench <- sqldf(prefilter)
+    cat("Removed ",pre-NROW(bench)," of ",pre," entries\n")
+}
+
+
 # Select benches from environment variable 'BENCHES' if applicable
 benches <- Sys.getenv("BENCHES",names=TRUE,unset=NA)
 benches_exclude <- Sys.getenv("BENCHES_EXCLUDE",names=TRUE,unset=NA)
