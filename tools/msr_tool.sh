@@ -1,16 +1,30 @@
 #!/bin/bash
 
 declare -A MSR_POWER_CTL=(
-	[NAME]=MSR_POWER_CTL [ADDR]=0x1FC [DESC]="Power Control Register" [DOMAIN]=Core
-	[BIT1]="C1E Enable" [MODE1]=RW [DOMAIN1]=Package
-	[BIT19]="Disable Race To Halt Optimization" [MODE19]=RW
-	[BIT20]="Disable Energy Efficiency Optimization" [MODE20]=RW
+	[NAME]=MSR_POWER_CTL [ADDR]=0x1FC [DESC]="Power Control Register" [DOMAIN]=Core [MODE]=RW
+	[BIT1]="C1E Enable" [DOMAIN1]=Package
+	[BIT19]="Disable Race To Halt Optimization"
+	[BIT20]="Disable Energy Efficiency Optimization"
 )
 
-declare -a MSRS=( MSR_POWER_CTL )
+declare -A IA32_MISC_ENABLE=(
+	[NAME]=IA32_MISC_ENABLE [ADDR]=0x1A0 [DESC]="Enable Misc. Processor Features" [DOMAIN]=Thread [MODE]=RW
+	[BIT0]="Fast-Strings Enable"
+	[BIT7]="Performance Monitoring Available" [MODE7]=RO
+	[BIT11]="Branch Trace Storage Unavailable" [MODE11]=RO
+	[BIT12]="Processor Event Based Sampling Unavailable" [MODE12]=RO
+	[BIT16]="Enhanced Intel SpeedStep Technology Enable" [DOMAIN16]=Package
+	[BIT18]="Enable Monitor FSM"
+	[BIT22]="Limit CPUID Maxval"
+	[BIT23]="xTPR Message Disable"
+	[BIT34]="XD Bit DIsable"
+	[BIT38]="Turbo Mode Disable" [DOMAIN38]=Package
+)
+
+declare -a MSRS=( MSR_POWER_CTL IA32_MISC_ENABLE )
 
 CPUNODES=$(find /dev/cpu -mindepth 1 -type d | sort)
-declare -a THREADS CORES PACKAGES
+declare -a THREADS=() CORES=() PACKAGES=()
 
 for i in ${CPUNODES[@]}; do
 	THREADS+=(${i##*/})
@@ -31,13 +45,13 @@ if [ ! -z $DEBUG ]; then
 fi
 
 #Generate MSR Map ...
-declare -A MSR_NAME
+declare -A MSR_NAME=()
 for i in ${MSRS[@]}; do
 	declare -n ptr="$i"
 	MSR_NAME[${ptr[NAME]}]=$i
 done
 
-declare -A MSR_ADDR
+declare -A MSR_ADDR=()
 for i in ${MSRS[@]}; do
 	declare -n ptr="$i"
 	MSR_ADDR[${ptr[ADDR]}]=$i
@@ -51,7 +65,7 @@ list() {
 		declare -n ptr="$i"
 		printf "${ptr[NAME]}[${ptr[ADDR]}] -- ${ptr[DESC]}\n"
 		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]})\n" $k
+			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
 		done
 	done
 }
@@ -77,8 +91,8 @@ printRegs() {
 		printf "${COLOR[White]}${ptr[NAME]}[${ptr[ADDR]}] -- ${ptr[DESC]}${COLOR[Default]}\n"
 		readCPU_MSRs ${ptr[ADDR]}
 		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]})" $k
-			CURLEN=$(printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]})" $k | wc -c)
+			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k
+			CURLEN=$(printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k | wc -c)
 			printf "%0$(($MAXLEN-$CURLEN))s" ""
 			for p in ${THREADS[@]}; do
 				V=$(( (${VALS[$p]} >> $k) & 1 ))
@@ -141,7 +155,7 @@ help() {
 #Helpers
 #Read MSR $1 for all Threads
 readCPU_MSRs() {
-	declare -gA VALS
+	declare -gA VALS=()
 	for p in ${THREADS[@]}; do
 		VALS[$p]=$(rdmsr -d -p $p $1)
 	done
@@ -150,7 +164,7 @@ readCPU_MSRs() {
 #Read MSRs specified by MSR for all distinct domains in DOMAIN
 readMSRs() {
 	declare -n cur="${DOMAIN^^}S"
-	declare -gA VALS
+	declare -gA VALS=()
 	for p in ${cur[@]}; do
 		VALS[$p]=$(rdmsr -d -p $p ${MSR[ADDR]})
 	done
@@ -158,7 +172,7 @@ readMSRs() {
 
 #Extracts bits $1 from $VALS and puts them in BITS
 extractBits() {
-	declare -gA BITS
+	declare -gA BITS=()
 	for p in ${!VALS[@]}; do
 		BITS[$p]=$(( (${VALS[$p]} >> $1) & 1 ))
 	done
@@ -171,7 +185,7 @@ getMSR() {
 		if [[ "#{MSR_ADDR[$1]}" = "#" ]]; then
 			echo "Unknown MSR $1"; exit 1;
 		fi
-		declare -ng MSR="${MSR_ADDR[$1}"
+		declare -ng MSR="${MSR_ADDR[$1]}"
 	else
 		#Try to get from symbolic name ...
 		if [[ "#${MSR_NAME[$1]}" = "#" ]]; then
@@ -198,7 +212,7 @@ maxlen() {
 	MAXLEN=$(for i in ${MSRS[@]}; do
 		declare -n ptr="$i"
 		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "\t\t  [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]})\n" $k
+			printf "\t\t  [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
 		done
 	done | wc -L)
 }
