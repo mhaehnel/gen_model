@@ -21,7 +21,52 @@ declare -A IA32_MISC_ENABLE=(
 	[BIT38]="Turbo Mode Disable" [DOMAIN38]=Package
 )
 
-declare -a MSRS=( MSR_POWER_CTL IA32_MISC_ENABLE )
+declare -A IA32_HWP_REQUEST=(
+	[NAME]=IA32_HWP_REQUEST [ADDR]=0x774 [DESC]="HWP Request Control" [DOMAIN]=Thread [MODE]=RW
+	[BIT0-7]="Minimum Performance"
+	[BIT8-15]="Maximum Performance"
+	[BIT16-23]="Desired Performance"
+	[BIT24-31]="Energy Performance Preference"
+	[BIT32-41]="Activity Window"
+	[BIT42]="Package Control"
+	[BIT59]="Activity Window Valid"
+	[BIT60]="EPP Valid"
+	[BIT61]="Desired Valid"
+	[BIT62]="Minimum Valid"
+	[BIT63]="Maximum Valid"
+)
+
+#UNUSED
+declare -A IA32_HWP_REQUEST_PKG=(
+	[NAME]=IA32_HWP_REQUEST_PKG [ADDR]=0x772 [DESC]="HWP Package Request Control" [DOMAIN]=Thread [MODE]=RW
+	[BIT0-7]="Minimum Performance"
+	[BIT8-15]="Maximum Performance"
+	[BIT16-23]="Desired Performance"
+	[BIT24-31]="Energy Performance Preference"
+	[BIT32-41]="Activity Window"
+)
+
+declare -A IA32_HWP_CAPABILITIES=(
+	[NAME]=IA32_HWP_CAPABILITIES [ADDR]=0x771 [DESC]="HWP Performance Range Enumeration" [DOMAIN]=Thread [MODE]=RO
+	[BIT0-7]="Highest Performance"
+	[BIT8-15]="Guaranteed Performance"
+	[BIT16-23]="Most Efficient Performance"
+	[BIT24-31]="Lowest Performance"
+)
+
+#TODO: Mode is R/W1Once
+declare -A IA32_PM_ENABLE=(
+	[NAME]=IA32_PM_ENABLE [ADDR]=0x770 [DESC]="Enable/Disable HWP" [DOMAIN]=Package [MODE]=RW
+	[BIT0]="HWP Enabled"
+)
+
+declare -A IA32_HWP_STATUS=(
+	[NAME]=IA32_HWP_STATUS [ADDR]=0x777 [DESC]="Log bits for HWP" [DOMAIN]=Thread [MODE]=RW
+	[BIT0]="Guaranteed Performance Change"
+	[BIT2]="Excursion to Minimum"
+)
+
+declare -a MSRS=( MSR_POWER_CTL IA32_MISC_ENABLE IA32_PM_ENABLE IA32_HWP_CAPABILITIES IA32_HWP_REQUEST IA32_HWP_STATUS)
 
 CPUNODES=$(find /dev/cpu -mindepth 1 -type d | sort)
 declare -a THREADS=() CORES=() PACKAGES=()
@@ -64,8 +109,12 @@ list() {
 	for i in ${MSRS[@]}; do
 		declare -n ptr="$i"
 		printf "${ptr[NAME]}[${ptr[ADDR]}] -- ${ptr[DESC]}\n"
-		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
+		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]+(-[BIT0-9]+)?( |$)' | cut -c4- | sort -n) ; do
+			if [[ $k =~ ^[0-9]+$ ]]; then
+				printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
+			else
+				printf "        [%02d-%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" ${k%-*} ${k#*-}
+			fi
 		done
 	done
 }
@@ -90,14 +139,22 @@ printRegs() {
 		declare -n ptr="$i"
 		printf "${COLOR[White]}${ptr[NAME]}[${ptr[ADDR]}] -- ${ptr[DESC]}${COLOR[Default]}\n"
 		readCPU_MSRs ${ptr[ADDR]}
-		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k
-			CURLEN=$(printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k | wc -c)
-			printf "%0$(($MAXLEN-$CURLEN))s" ""
+		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]+(-[BIT0-9]+)?( |$)' | cut -c4- | sort -n) ; do
+			if [[ $k =~ ^[0-9]+$ ]]; then
+				printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k
+				CURLEN=$(printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" $k | wc -c)
+				printf "%0$(($MAXLEN-$CURLEN))s" ""
+			else
+				printf "        [%02d-%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" ${k%-*} ${k#*-}
+				CURLEN=$(printf "        [%02d-%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})" ${k%-*} ${k#*-} | wc -c)
+				printf "%0$(($MAXLEN-$CURLEN))s" ""
+			fi
+
 			for p in ${THREADS[@]}; do
-				V=$(( (${VALS[$p]} >> $k) & 1 ))
-				[[ $V = 0 ]] && printf "${COLOR[Red]}" || printf "${COLOR[Green]}"
-				printf "   %01d   ${COLOR[Default]}" $V
+				VLEN=$( bc -l <<< "scale=0; (l(2^(${k#*-}-${k%-*}))/l(10)+1.5)/1" )
+				extractBits ${k%-*} $((${k#*-} - ${k%-*} +1 ))
+				[[ ${BITS[$p]} = 0 ]] && printf "${COLOR[Red]}" || printf "${COLOR[Green]}"
+				printf " %0${VLEN}d%0$((6-${VLEN}))s${COLOR[Default]}" ${BITS[$p]}
 			done
 			printf "\n"
 		done
@@ -106,17 +163,18 @@ printRegs() {
 
 #Arguments REG:BIT=VALUE
 ensure() {
-	if [[ ! $1 =~ ^[^:]*:[^=]*=[0-9]*$ ]]; then
+	if [[ ! $1 =~ ^[^:]+:[^=]+=[0-9]+(-[0-9]+)?$ ]]; then
 		echo "$1 is invalid ensure instruction"
 		exit 1
 	fi
 	BIT=${1#*:}
 	BIT=${BIT%=*}
+	BITCOUNT=$(( ${BIT#*-} - ${BIT%-*} +1 ))
 	VAL=${1#*=}
 	getMSR ${1%%:*}
 	getDomain ${BIT}
 	readMSRs
-	extractBits ${BIT}
+	extractBits ${BIT%-*} $BITCOUNT
 	UPD=()
 	[ $VAL -eq 0 ] && COL=${COLOR[Red]} || COL=${COLOR[Green]}
 	if [ -z $SILENT ]; then
@@ -125,12 +183,12 @@ ensure() {
 		printf " has Value ${COL}${VAL}${COLOR[Default]}\n"
 	fi
 	for m in ${!BITS[@]}; do
-		if [[ ${BITS[$m]} -ne ${1#*=} ]]; then
-			if [ ${1#*=} -eq 0 ]; then
-				NEWVAL=$(( ${VALS[$m]} & ~(1 << ${BIT}) ))
-			else
-				NEWVAL=$(( ${VALS[$m]} ^ (1 << ${BIT}) ))
-			fi
+		if [[ ${BITS[$m]} -ne ${VAL} ]]; then
+			#Reset old bits ...
+			NEWVAL=$(( ${VALS[$m]} & ~(( (1 << $BITCOUNT) -1 ) << ${BIT%-*}) ))
+			[ ! -z $DEBUG ] && echo "Clearing bits MSR ${MSR[ADDR]} on CPU $m from Value ${VALS[$m]} to $NEWVAL (BITCOUNT=$BITCOUNT, SHIFT=${BIT%-*})"
+			#Patch in new bits ...
+			NEWVAL=$(( ${NEWVAL} | ( ${VAL} << ${BIT%-*}) ))
 			[ ! -z $DEBUG ] && echo "Writing MSR ${MSR[ADDR]} on CPU $m from Value ${VALS[$m]} to $NEWVAL"
 			wrmsr  -p $m ${MSR[ADDR]} $NEWVAL
 			UPD+=($m)
@@ -174,7 +232,8 @@ readMSRs() {
 extractBits() {
 	declare -gA BITS=()
 	for p in ${!VALS[@]}; do
-		BITS[$p]=$(( (${VALS[$p]} >> $1) & 1 ))
+#		echo "(${VALS[$p]} >> $1) & ((1 << ${2:-1}) -1)"
+		BITS[$p]=$(( (${VALS[$p]} >> $1) & ((1 << ${2:-1}) -1) ))
 	done
 }
 
@@ -212,7 +271,11 @@ maxlen() {
 	MAXLEN=$(for i in ${MSRS[@]}; do
 		declare -n ptr="$i"
 		for k in $( echo ${!ptr[@]} | grep -oP '\bBIT[0-9]*( |$)' | cut -c4- | sort -n) ; do
-			printf "\t\t  [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
+			if [[ $k =~ ^[0-9]+$ ]]; then
+				printf "        [%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" $k
+			else
+				printf "        [%02d-%02d]: ${ptr[BIT$k]} (${ptr[MODE$k]:-${ptr[MODE]}})\n" ${k%-*} ${k#*-}
+			fi
 		done
 	done | wc -L)
 }
