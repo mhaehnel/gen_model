@@ -7,6 +7,3 @@ ensure MSR_POWER_CTL:1=0
 ensure MSR_POWER_CTL:19=1
 ensure MSR_POWER_CTL:20=1
 ensure IA32_MISC_ENABLE:38=1
-
-printRegs
-
