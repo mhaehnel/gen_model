@@ -196,7 +196,7 @@ ensure() {
 	done
 	if [[ -z $SILENT && ${#UPD} -gt 0 ]]; then
 		printf "    => ${COLOR[White]}Updated"
-		printf " on ${DOMAIN}s ${UPD[*]}\n"
+		printf " on ${DOMAIN}s ${UPD[*]}${COLOR[Default]}\n"
 	fi
 }
 
