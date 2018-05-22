@@ -17,7 +17,7 @@ FREQ_STEP_MODE=${FREQ_STEP_MODE:-distance}
 RATE_MS=${RATE_MS:-500}
 
 # The minimum runtime each benchmark should be executed at each configuration in seconds
-MIN_RUNTIME=${MIN_RUNTIME:-80}
+MIN_RUNTIME=${MIN_RUNTIME:-60}
 
 # The logfile for the output of elab
 ELAB_LOG=${ELAB_LOG:-/dev/null}
