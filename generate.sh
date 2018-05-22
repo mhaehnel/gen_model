@@ -25,7 +25,7 @@ export RATE_MS=${RATE_MS:-1000}
 BENCH_ERROR_LOG=${BENCH_ERROR_LOG:-bench.log}
 
 # Make sure that the system is prepared accordingly
-sudo $BASE_DIR/tools/disable_energy_automatisms.sh >$BENCH_ERROR_LOG 2>&1
+sudo $BASE_DIR/tools/disable_energy_automatisms.sh
 
 $BASE_DIR/tools/bench.sh 2>$BENCH_ERROR_LOG || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
 
