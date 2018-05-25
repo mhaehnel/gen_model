@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 ## Global Variables
+# Whether or not turbo boost should be measured too
+TURBO_BOOST=${TURBO_BOOST:-0}
+
 # Number of different frequencies that should be tested
 FREQ_STEPS=${FREQ_STEPS:-6}
 
@@ -67,8 +70,6 @@ EOF
 fi
 
 # Setup the script's internals
-min_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq)
-max_freq=$(< /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
 all_freqs=( $(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies) )
 cpu_gov=$(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
 nr_cpus=$(grep "cpu cores" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
@@ -95,6 +96,16 @@ EOF
 fi
 
 arr_reverse all_freqs
+
+# Remove the turbo frequency from the list of frequencies
+if (( ((${all_freqs[${#all_freqs[@]}-1]} / 1000) % 10) == 1 )); then
+    turbo_freq=${all_freqs[${#all_freqs[@]}-1]}
+    unset all_freqs[${#all_freqs[@]}-1]
+else
+    turbo_freq=
+fi
+min_freq=${all_freqs[0]}
+max_freq=${all_freqs[${#all_freqs[@]}-1]}
 
 declare -a freqs
 if [ $FREQ_STEP_MODE = stepwise ]
@@ -139,6 +150,14 @@ else
     echo >&2 "Unknown FREQ_STEP_MODE ($FREQ_STEP_MODE)"; exit 1
 fi
 
+if [ $TURBO_BOOST -eq 1 ]; then
+    if [ "x$turbo_freq" == "x" ]; then
+        echo -ne "Turbo mode not supported by this processor\n" >&2
+    else
+        freqs+=( $turbo_freq )
+    fi
+fi
+
 cpu_step=$(($nr_cpus/$CPU_STEPS))
 cpu=1
 cpus="1"
@@ -154,6 +173,7 @@ cat << EOF
 Detected system configuration:
 CPUs: $nr_cpus ($nr_hts HTs)
 Frequencies: $min_freq-$max_freq (@${cpu_gov}) {${all_freqs[@]}}
+Turbo: $(if [ "x$turbo_freq" == "x" ]; then echo "disabled"; else echo $turbo_freq; fi)
 
 Using the following steps:
 CPUs ($CPU_STEPS steps): $cpus
