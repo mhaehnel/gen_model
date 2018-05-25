@@ -167,6 +167,9 @@ for (b in benches) {
     cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
 }
 cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
+for (b in benches) {
+    cat("MAPE Power (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$power_abserr_rel),thresholds,colors,FALSE),"\n")
+}
 cat("MAPE Power: ",colorprint(mean(bench$power_abserr_rel),thresholds,colors,FALSE),"\n")
 
 write.csv(bench, "r_data.csv")
