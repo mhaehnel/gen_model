@@ -110,7 +110,7 @@ bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'
 
 
 bench <- within(bench, {
-    IPC <- instructions/`cpu-cycles`
+    IPC <- instructions/(`cpu-cycles`/cpus)
     ht <- ifelse(ht == "enable", 1, 0)
 
     # 'cache-events' counts everything that contains the cache, but we are only interested in cache hits
@@ -118,6 +118,7 @@ bench <- within(bench, {
 
     # calculate the heaviness of the applications
     memory_heaviness <- `memory-events`/instructions
+    nomemory_heaviness <- 1-memory_heaviness
     cache_heaviness <- `cache-hits`/instructions
     avx_heaviness <- `avx-events`/instructions
     branch_heaviness <- `branch-events`/instructions
@@ -130,46 +131,94 @@ bench <- within(bench, {
 })
 
 m_IPC <- lm(IPC ~
-                memory_heaviness +
-                poly(cache_heaviness,3,raw=TRUE) +
-                poly(compute_heaviness,3,raw=TRUE) +
-                poly(avx_heaviness,3,raw=TRUE) +
-                poly(freq,3,raw=TRUE) +
+                poly(memory_heaviness,2,raw=TRUE)*cpus*freq +
+                poly(cache_heaviness,2,raw=TRUE)*cpus*freq +
+                poly(compute_heaviness,2,raw=TRUE)*cpus*freq +
+                poly(avx_heaviness,2,raw=TRUE)*cpus*freq +
+#                poly(freq,2,raw=TRUE) +
+#                poly(cpus,2,raw=TRUE) +
                 ht,
             data=bench)
 sm_IPC <- summary(m_IPC)
 print(sm_IPC)
 
+m_power_cores <- lm(power_cores ~
+                nomemory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC, 
+#                avx_heaviness*freq*cpus
+#                IPC +
+#                poly(freq,3,raw=TRUE) +
+#                cpus
+#                ht,
+            ,data=bench)
+sm_power_cores <- summary(m_power_cores)
+print(sm_power_cores)
+
+m_power_ram <- lm(power_ram ~
+                memory_heaviness*IPC *
+                 freq*cpus
+            ,data=bench)
+sm_power_ram <- summary(m_power_ram)
+print(sm_power_ram)
+
 m_power <- lm(power_pkg ~
-                poly(IPC,3,raw=TRUE) +
-                poly(freq,3,raw=TRUE) +
-                poly(cpus,3,raw=TRUE) +
-                ht,
-            data=bench)
+                memory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC 
+#                poly(freq,3,raw=TRUE) +
+#                cpus# +
+#                ht
+            ,data=bench)
 sm_power <- summary(m_power)
 print(sm_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness)
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus)
+    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
     power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
+    power_modeled_ripc <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ripc <- abs(power_modeled_ripc - power_pkg) / power_pkg
+    power_modeled_ram <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ram <- abs(power_modeled_ram - power_ram) / power_ram
+    power_modeled_ram_ripc <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ram_ripc <- abs(power_modeled_ram_ripc - power_ram) / power_ram
+    power_modeled_cores <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_abserr_rel_cores <- abs(power_modeled_cores - power_cores) / power_cores
+    power_modeled_cores_ripc <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_abserr_rel_cores_ripc <- abs(power_modeled_cores_ripc - power_cores) / power_cores
 })
 
-print_eqn(sm_IPC)
-print_eqn(sm_power)
+cat("IPC = "); print_eqn(sm_IPC)
+cat("P_pkg = "); print_eqn(sm_power)
+cat("P_ram = "); print_eqn(sm_power_ram)
+cat("P_cores = "); print_eqn(sm_power_cores)
 
 colors = c("green","yellow","white","magenta","red")
-thresholds=c(0.02,0.05,0.1,0.2,1.0)
+thresholds=c(0.05,0.07,0.1,0.15,1.0)
+
+cat('Datapoints as basis for models and evaluation: ',nrow(bench),"\n")
+cat(style("columns denoted with ' use real IPC values, not modeled ones\n\n","green"))
+
+metrics <- c("IPC","P_PKG","P_CORES","P_RAM","P_PKG'","P_CORES'","P_RAM'")
+metric_columns <- c("IPC_abserr_rel","power_abserr_rel","power_abserr_rel_cores","power_abserr_rel_ram",
+                "power_abserr_rel_ripc","power_abserr_rel_cores_ripc","power_abserr_rel_ram_ripc")
+
+cat(rep(" ",12),sep="")
+for (m in metrics) {
+    cat(sprintf(" %-8s",m))
+}
+cat("\n")
 
 for (b in benches) {
-    cat("MAPE IPC (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
+    cat(sprintf("%-10s:",b))
+    for (m in metric_columns) {
+        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))[[m]]))),thresholds,colors,FALSE))
+    }
+    cat("\n")
 }
-cat("MAPE IPC: ",colorprint(mean(bench$IPC_abserr_rel),thresholds,colors,FALSE),"\n")
-for (b in benches) {
-    cat("MAPE Power (",b,"): ",colorprint(mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))$power_abserr_rel),thresholds,colors,FALSE),"\n")
+cat("MAPE (all):")
+for (m in metric_columns) {
+    cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(bench[[m]]))),thresholds,colors,FALSE))
 }
-cat("MAPE Power: ",colorprint(mean(bench$power_abserr_rel),thresholds,colors,FALSE),"\n")
+cat("\n")
 
 write.csv(bench, "r_data.csv")
