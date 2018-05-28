@@ -26,10 +26,10 @@ MIN_RUNTIME=${MIN_RUNTIME:-30}
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # The directory where the intermediate output files of perf should be saved
-PERF_DIR=${PERF_DIR:-perf_csv}
+DATA_DIR=${DATA_DIR:-eris_data_csv}
 
 # The file where the final CSV output should be saved to
-CSV=${CSV:-bench.csv}
+CSV=${CSV:-eris_bench.csv}
 
 # The directories where the script and the benchmark files are located
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
@@ -234,9 +234,9 @@ while read bench clients interval factor requests; do
 
                 while (($(date +%s) - $start_ts < $MIN_RUNTIME)); do
                     perf_counter_out_tmp="$(mktemp)"
-                    perf_counter_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
-                    perf_energy_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
-                    eris_ctrl_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.eris.csv"
+                    perf_counter_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
+                    perf_energy_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
+                    eris_ctrl_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.eris.csv"
 
                     if [ $ht == disable ]; then
                         taskset_cpus="0-$(($cpu-1))"
