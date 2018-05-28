@@ -26,7 +26,7 @@ MIN_RUNTIME=${MIN_RUNTIME:-30}
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # The directory where the intermediate output files of perf should be saved
-DATA_DIR=${DATA_DIR:-eris_data_csv}
+DATA_DIR=${DATA_DIR:-"$(pwd)/eris_data_csv"}
 
 # The file where the final CSV output should be saved to
 CSV=${CSV:-eris_bench.csv}
@@ -200,7 +200,7 @@ esac
 # Fully abort the script upon CTRL-C
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 
-mkdir -p $PERF_DIR
+mkdir -p $DATA_DIR
 
 exec 3<> $ELAB_LOG
 elab ht enable >&3
