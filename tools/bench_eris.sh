@@ -229,52 +229,45 @@ while read bench clients interval factor requests; do
                 fi
 
                 file_ts=$(date +%Y_%m_%d-%H_%M_%S)
-                start_ts=$(date +%s)
-                iter=1
+                perf_counter_out_tmp="$(mktemp)"
+                perf_counter_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.ctr.csv"
+                perf_energy_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.energy.csv"
+                eris_ctrl_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.eris.csv"
 
-                while (($(date +%s) - $start_ts < $MIN_RUNTIME)); do
-                    perf_counter_out_tmp="$(mktemp)"
-                    perf_counter_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
-                    perf_energy_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
-                    eris_ctrl_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.eris.csv"
+                if [ $ht == disable ]; then
+                    taskset_cpus="0-$(($cpu-1))"
+                    c=$cpu
+                else
+                    taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
+                    c=$(($cpu*2))
+                fi
 
-                    if [ $ht == disable ]; then
-                        taskset_cpus="0-$(($cpu-1))"
-                        c=$cpu
-                    else
-                        taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
-                        c=$(($cpu*2))
-                    fi
+                curdir=$(pwd)
+                cd $ERIS_DIR
 
-                    curdir=$(pwd)
-                    cd $ERIS_DIR
+                taskset -c $taskset_cpus \
+                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
+                    perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
+                    build/eris 1>/dev/null 2>&1 &
+                pid_ERIS=$!
 
-                    taskset -c $taskset_cpus \
-                        perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
-                        perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
-                        build/eris >/dev/null &
-                    pid_ERIS=$!
+                $ERIS_CTRL_DIR/eris-bench run --user=euf --passwd=euf --wait --csv --out=$eris_ctrl_out --duration=$MIN_RUNTIME --mode=timed --factor=$factor --clients=$clients --interval=$interval --requests=$requests $bench
+                kill $pid_ERIS
 
-                    $ERIS_CTRL_DIR/eris-bench run --user=euf --passwd=euf --wait --csv --out=$eris_ctrl_out --duration=$MIN_RUNTIME --mode=timed --factor=$factor --clients=$clients --interval=$interval --requests=$requests $bench
-                    kill $pid_ERIS
+                cd $curdir
+                mv "$perf_counter_out_tmp" "$perf_counter_out"
 
-                    cd $curdir
-                    mv "$perf_counter_out_tmp" "$perf_counter_out"
+                # rename the events to predefined names
+                sed -i "s#${INSTR_EVENT}#instructions#g" $perf_counter_out
+                sed -i "s#${CYCLE_EVENT}#cpu-cycles#g" $perf_counter_out
+                sed -i "s#${CYCLE_REF_EVENT}#cpu-cycles-ref#g" $perf_counter_out
+                sed -i "s#${BRANCH_EVENT}#branch-events#g" $perf_counter_out
+                sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
+                sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
+                sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
 
-                    # rename the events to predefined names
-                    sed -i "s#${INSTR_EVENT}#instructions#g" $perf_counter_out
-                    sed -i "s#${CYCLE_EVENT}#cpu-cycles#g" $perf_counter_out
-                    sed -i "s#${CYCLE_REF_EVENT}#cpu-cycles-ref#g" $perf_counter_out
-                    sed -i "s#${BRANCH_EVENT}#branch-events#g" $perf_counter_out
-                    sed -i "s#${CACHE_EVENT}#cache-events#g" $perf_counter_out
-                    sed -i "s#${MEMORY_EVENT}#memory-events#g" $perf_counter_out
-                    sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
-
-                    # We are done with the benchmark -- parse the perf output file
-                    $BASE_DIR/parse_csv_eris.py $bench $ht $c $freq $perf_counter_out $perf_energy_out $eris_ctrl_out -o $CSV --append
-
-                    iter=$(($iter + 1))
-                done
+                # We are done with the benchmark -- parse the perf output file
+                #$BASE_DIR/parse_csv_eris.py $bench $ht $c $freq $perf_counter_out $perf_energy_out $eris_ctrl_out -o $CSV --append
 
                 if [ $ht == disable ]; then
                     elab ht enable >&3
