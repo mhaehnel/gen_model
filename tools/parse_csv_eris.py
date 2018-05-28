@@ -171,7 +171,7 @@ for l in energy_lines:
 # Now match the eris values to the perf values
 eris_values = []
 last_val = 0
-for l in eris_lins[1:]:
+for l in eris_lines[1:]:
     eles = l.split(";")
     name = eles[0]
     ts = float(eles[1].strip())/1000
