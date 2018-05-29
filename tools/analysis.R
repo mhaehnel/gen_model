@@ -79,10 +79,13 @@ solve_eqn <- function(sum,...) {
 
 # Main
 args = commandArgs(trailingOnly=TRUE)
-if (length(args) == 0) {
-    args[1] = "bench.csv"
+if (length(args) < 2) {
     args[2] = "eris.csv"
 }
+if (length(args) < 1) {
+    args[1] = "bench.csv"
+}
+
 
 # Readin the data
 bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
