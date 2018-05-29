@@ -93,9 +93,9 @@ eris <- read_delim(args[2], ";", escape_double = FALSE, trim_ws = TRUE, col_type
 
 # Do some additional filtering on the data
 cat("Filtering data\n")
-prefilter <- Sys.getenv("PREFILTER",unset=NA)
 
 pre <- NROW(bench)
+prefilter <- Sys.getenv("PREFILTER",unset=NA)
 if (!is.na(prefilter)) {
     filter <- str_replace(prefilter, "<data>", "bench")
     bench <- sqldf(filter)
@@ -116,6 +116,7 @@ bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'
 cat("Removed ",pre-NROW(bench)," of ",pre," entries from bench data\n")
 
 pre <- NROW(eris)
+prefilter <- Sys.getenv("ERIS_PREFILTER",unset=NA)
 if (!is.na(prefilter)) {
     filter <- str_replace(prefilter, "<data>", "eris")
     eris <- sqldf(filter)
@@ -239,31 +240,36 @@ colors = c("green","yellow","white","magenta","red")
 thresholds=c(0.05,0.07,0.1,0.15,1.0)
 
 cat("\n== Results for NPB bechmarks ==\n")
-cat('Datapoints as basis for models and evaluation: ',nrow(bench),"\n")
 cat(style("columns denoted with ' use real IPC values, not modeled ones\n\n","green"))
 
 metrics <- c("IPC","P_PKG","P_CORES","P_RAM","P_PKG'","P_CORES'","P_RAM'")
 metric_columns <- c("IPC_abserr_rel","power_abserr_rel","power_abserr_rel_cores","power_abserr_rel_ram",
                 "power_abserr_rel_ripc","power_abserr_rel_cores_ripc","power_abserr_rel_ram_ripc")
 
-cat(rep(" ",12),sep="")
-for (m in metrics) {
-    cat(sprintf(" %-8s",m))
-}
-cat("\n")
+print_eval <- function(dataframe,benches,metrics,metric_columns) {
+    cat('Datapoints as basis for models and evaluation: ',nrow(dataframe),"\n")
+    prstr <- max(nchar(benches),nchar("MAPE (all)"))
+    cat(rep(" ",prstr+2),sep="")
+    for (m in metrics) {
+        cat(sprintf(" %-8s",m))
+    }
+    cat("\n")
 
-for (b in benches) {
-    cat(sprintf("%-10s:",b))
+    for (b in benches) {
+        cat(sprintf("%-*s:",prstr,b))
+        for (m in metric_columns) {
+            cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(sqldf(paste('select * from ',substitute(dataframe),' where bench == "',b,'"',sep=""))[[m]]))),thresholds,colors,FALSE))
+        }
+        cat("\n")
+    }
+    cat(sprintf("%-*s:",prstr,"MAPE (all)"))
     for (m in metric_columns) {
-        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(sqldf(paste('select * from bench where bench == "',b,'"',sep=""))[[m]]))),thresholds,colors,FALSE))
+        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(bench[[m]]))),thresholds,colors,FALSE))
     }
     cat("\n")
 }
-cat("MAPE (all):")
-for (m in metric_columns) {
-    cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(bench[[m]]))),thresholds,colors,FALSE))
-}
-cat("\n")
+
+print_eval(bench,benches,metrics,metric_columns)
 
 # Solve it for eris
 eris <- within(eris, {
@@ -283,30 +289,8 @@ eris <- within(eris, {
     power_abserr_rel_cores_ripc <- abs(power_modeled_cores_ripc - power_cores) / power_cores
 })
 
-metrics <- c("IPC","P_PKG","P_CORES","P_RAM","P_PKG'","P_CORES'","P_RAM'")
-metric_columns <- c("IPC_abserr_rel","power_abserr_rel","power_abserr_rel_cores","power_abserr_rel_ram",
-                "power_abserr_rel_ripc","power_abserr_rel_cores_ripc","power_abserr_rel_ram_ripc")
-
 cat("\n== Results for ERIS ==\n")
-cat('Datapoints as basis for models and evaluation: ',nrow(eris),"\n")
 
-cat(rep(" ",12),sep="")
-for (m in metrics) {
-    cat(sprintf(" %-8s",m))
-}
-cat("\n")
-
-for (b in eris_benches) {
-    cat(sprintf("%-10s:",b))
-    for (m in metric_columns) {
-        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(sqldf(paste('select * from eris where bench == "',b,'"',sep=""))[[m]]))),thresholds,colors,FALSE))
-    }
-    cat("\n")
-}
-cat("MAPE (all):")
-for (m in metric_columns) {
-    cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(eris[[m]]))),thresholds,colors,FALSE))
-}
-cat("\n")
+print_eval(eris,eris_benches,metrics,metric_columns)
 
 #write.csv(bench, "r_data.csv")
