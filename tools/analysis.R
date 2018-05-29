@@ -5,7 +5,7 @@ required.packages <- c("crayon","RSQLite","proto","gsubfn","readr","sqldf","stri
 new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 for (p in required.packages) {
-  library(p,character.only =TRUE)
+  suppressWarnings(library(p,character.only =TRUE))
 }
 
 # Helper functions
