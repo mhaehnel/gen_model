@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Install all the necessary packages
-required.packages <- c("crayon","RSQLite","proto","gsubfn","readr","sqldf")
+required.packages <- c("crayon","RSQLite","proto","gsubfn","readr","sqldf","stringr")
 new.packages <- required.packages[!(required.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 for (p in required.packages) {
@@ -81,34 +81,52 @@ solve_eqn <- function(sum,...) {
 args = commandArgs(trailingOnly=TRUE)
 if (length(args) == 0) {
     args[1] = "bench.csv"
+    args[2] = "eris.csv"
 }
-bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE,col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
+# Readin the data
+bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
+eris <- read_delim(args[2], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
+
+# Do some additional filtering on the data
+cat("Filtering data\n")
 prefilter <- Sys.getenv("PREFILTER",unset=NA)
+
+pre <- NROW(bench)
 if (!is.na(prefilter)) {
-    pre <- NROW(bench)
-    cat("Filtering data\n")
-    bench <- sqldf(prefilter)
-    cat("Removed ",pre-NROW(bench)," of ",pre," entries\n")
+    filter <- str_replace(prefilter, "<data>", "bench")
+    bench <- sqldf(filter)
 }
 
-
-# Select benches from environment variable 'BENCHES' if applicable
 benches <- Sys.getenv("BENCHES",names=TRUE,unset=NA)
-benches_exclude <- Sys.getenv("BENCHES_EXCLUDE",names=TRUE,unset=NA)
 if (!is.na(benches)) {
     benches <- unlist(strsplit(benches,","))
 } else {
     benches <- unlist(sqldf("SELECT DISTINCT bench FROM bench")["bench"])
 }
 
+benches_exclude <- Sys.getenv("BENCHES_EXCLUDE",names=TRUE,unset=NA)
 if (!is.na(benches_exclude)) {
     benches <- setdiff(benches,unlist(strsplit(benches_exclude,",")))
 }
-
 bench <- sqldf(paste0("SELECT * FROM bench WHERE bench IN (",paste(sprintf("'%s'",benches),collapse=","),")"))
+cat("Removed ",pre-NROW(bench)," of ",pre," entries from bench data\n")
 
+pre <- NROW(eris)
+if (!is.na(prefilter)) {
+    filter <- str_replace(prefilter, "<data>", "eris")
+    eris <- sqldf(filter)
+}
+eris_benches <- Sys.getenv("ERIS_BENCHES",names=TRUE,unset=NA)
+if (!is.na(eris_benches)) {
+    eris_benches <- unlist(strsplit(eris_benches,","))
+} else {
+    eris_benches <- unlist(sqldf("SELECT DISTINCT bench FROM eris")["bench"])
+}
+eris <- sqldf(paste0("SELECT * FROM eris WHERE bench IN (",paste(sprintf("'%s'",eris_benches),collapse=","),")"))
+cat("Removed ",pre-NROW(eris)," of ",pre," entries from ERIS data\n")
 
+# Prepare the data
 bench <- within(bench, {
     IPC <- instructions/(`cpu-cycles`/cpus)
     ht <- ifelse(ht == "enable", 1, 0)
@@ -130,6 +148,28 @@ bench <- within(bench, {
     power_pkg <- `power/energy-pkg/`/`t_diff`
 })
 
+eris <- within(eris, {
+    IPC <- instructions/(`cpu-cycles`/cpus)
+    ht <- ifelse(ht == "enable", 1, 0)
+
+    # 'cache-events' counts everything that contains the cache, but we are only interested in cache hits
+    `cache-hits` <- `cache-events` - `memory-events`
+
+    # calculate the heaviness of the applications
+    memory_heaviness <- `memory-events`/instructions
+    nomemory_heaviness <- 1-memory_heaviness
+    cache_heaviness <- `cache-hits`/instructions
+    avx_heaviness <- `avx-events`/instructions
+    branch_heaviness <- `branch-events`/instructions
+    compute_heaviness <- (instructions - `cache-hits` - `memory-events` - `avx-events` - `branch-events`)/instructions
+
+    # calculate the power consumption
+    power_ram <- `power/energy-ram/`/`t_diff`
+    power_cores <- `power/energy-cores/`/`t_diff`
+    power_pkg <- `power/energy-pkg/`/`t_diff`
+})
+
+# Generate the models
 m_IPC <- lm(IPC ~
                 poly(memory_heaviness,2,raw=TRUE)*cpus*freq +
                 poly(cache_heaviness,2,raw=TRUE)*cpus*freq +
@@ -195,6 +235,7 @@ cat("P_cores = "); print_eqn(sm_power_cores)
 colors = c("green","yellow","white","magenta","red")
 thresholds=c(0.05,0.07,0.1,0.15,1.0)
 
+cat("\n== Results for NPB bechmarks ==\n")
 cat('Datapoints as basis for models and evaluation: ',nrow(bench),"\n")
 cat(style("columns denoted with ' use real IPC values, not modeled ones\n\n","green"))
 
@@ -221,4 +262,48 @@ for (m in metric_columns) {
 }
 cat("\n")
 
-write.csv(bench, "r_data.csv")
+# Solve it for eris
+eris <- within(eris, {
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
+    IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
+    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
+    power_modeled_ripc <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ripc <- abs(power_modeled_ripc - power_pkg) / power_pkg
+    power_modeled_ram <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ram <- abs(power_modeled_ram - power_ram) / power_ram
+    power_modeled_ram_ripc <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_abserr_rel_ram_ripc <- abs(power_modeled_ram_ripc - power_ram) / power_ram
+    power_modeled_cores <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_abserr_rel_cores <- abs(power_modeled_cores - power_cores) / power_cores
+    power_modeled_cores_ripc <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_abserr_rel_cores_ripc <- abs(power_modeled_cores_ripc - power_cores) / power_cores
+})
+
+metrics <- c("IPC","P_PKG","P_CORES","P_RAM","P_PKG'","P_CORES'","P_RAM'")
+metric_columns <- c("IPC_abserr_rel","power_abserr_rel","power_abserr_rel_cores","power_abserr_rel_ram",
+                "power_abserr_rel_ripc","power_abserr_rel_cores_ripc","power_abserr_rel_ram_ripc")
+
+cat("\n== Results for ERIS ==\n")
+cat('Datapoints as basis for models and evaluation: ',nrow(eris),"\n")
+
+cat(rep(" ",12),sep="")
+for (m in metrics) {
+    cat(sprintf(" %-8s",m))
+}
+cat("\n")
+
+for (b in eris_benches) {
+    cat(sprintf("%-10s:",b))
+    for (m in metric_columns) {
+        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(sqldf(paste('select * from eris where bench == "',b,'"',sep=""))[[m]]))),thresholds,colors,FALSE))
+    }
+    cat("\n")
+}
+cat("MAPE (all):")
+for (m in metric_columns) {
+    cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(eris[[m]]))),thresholds,colors,FALSE))
+}
+cat("\n")
+
+#write.csv(bench, "r_data.csv")
