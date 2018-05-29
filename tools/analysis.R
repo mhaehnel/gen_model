@@ -91,10 +91,21 @@ if (length(args) < 1) {
 bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 eris <- read_delim(args[2], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
+
+pre <- NROW(bench)
+if (Sys.getenv("ERIS_MERGE",unset="N") != "N") {
+    cat(style("Mergin ERIS data into calibration data","red"),"\n")
+    cE <- colnames(eris)
+    cB <- colnames(bench)
+    additional <- cE[!cE %in% cB]
+    cat("Removing ",paste(additional),"\n")
+    bench <- rbind(bench,eris[,-which(names(eris) %in% additional)] )
+}
+cat("Added",NROW(bench)-pre,"rows\n")
+
 # Do some additional filtering on the data
 cat("Filtering data\n")
 
-pre <- NROW(bench)
 prefilter <- Sys.getenv("PREFILTER",unset=NA)
 if (!is.na(prefilter)) {
     filter <- str_replace(prefilter, "<data>", "bench")
