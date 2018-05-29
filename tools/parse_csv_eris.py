@@ -34,22 +34,15 @@ def match_energy_counter(values, last_best, current_ts, max_diff, force_next=Fal
 
     raise MatchError("Can't find performance counter match for energy value: {}".format(current_ts))
 
-def match_eris_counter(values, last_best, current_ts, max_diff):
-    # Check if the one we used last time is still close enough
-    if abs(values[last_best]["ts"] - current_ts) < max_diff:
-        return last_best
+def match_eris_counter(values, last_best, current_ts):
+    best = last_best
 
-    # Otherwise search starting from the last one another value that fits better
-    for i in range(last_best+1, len(values)):
-        if abs(values[i]["ts"] - current_ts) < max_diff:
-            return i
+    # Find the counter that is closest to the current one
+    for i in range(len(values)):
+        if abs(values[best]["ts"] - current_ts) > abs(values[i]["ts"] - current_ts):
+            best = i
 
-    # If we still can't find any, we start searching from the beginning, maybe we find a match there
-    for i in range(0, last_best):
-        if abs(values[i]["ts"] - current_ts) < max_diff:
-            return i
-
-    raise MatchError("Can't find performance counter match for eris value: {}".format(current_ts))
+    return best
 
 
 
@@ -135,7 +128,7 @@ for l in ctr_lines:
     values[-1][name] = value
 
 # Next read in the RAPL counter values and try to match them with the performance counters
-MAX_DIFF = 0.02      # The maximum difference in the time stamps to still be counted equal (seconds)
+MAX_DIFF = 0.03      # The maximum difference in the time stamps to still be counted equal (seconds)
 last_val = 0
 
 for l in energy_lines:
@@ -175,10 +168,10 @@ for l in eris_lines[1:]:
     eles = l.split(";")
     name = eles[0]
     ts = float(eles[1].strip())/1000
-    value = float(eles[1].strip())
+    value = float(eles[2].strip())
 
     try:
-        last_val = match_eris_counter(values, last_val, ts, MAX_DIFF)
+        last_val = match_eris_counter(values, last_val, ts)
     except MatchError as e:
         print("WARNING: " + str(e), file=sys.stderr)
 
@@ -187,7 +180,7 @@ for l in eris_lines[1:]:
         eris_values.append(last_val)
 
 # Done parsing, create the output
-columns = list(values[0].keys())
+columns = list(values[eris_values[0]].keys())
 needs_header = True
 out = sys.stdout
 
