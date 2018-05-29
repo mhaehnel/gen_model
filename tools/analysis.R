@@ -228,19 +228,23 @@ print(sm_power)
 bench <- within(bench, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
-    power_modeled_ripc <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ripc <- abs(power_modeled_ripc - power_pkg) / power_pkg
-    power_modeled_ram <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ram <- abs(power_modeled_ram - power_ram) / power_ram
-    power_modeled_ram_ripc <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ram_ripc <- abs(power_modeled_ram_ripc - power_ram) / power_ram
-    power_modeled_cores <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_abserr_rel_cores <- abs(power_modeled_cores - power_cores) / power_cores
-    power_modeled_cores_ripc <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_abserr_rel_cores_ripc <- abs(power_modeled_cores_ripc - power_cores) / power_cores
+    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_ram_modeled <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_ram_ripc_modeled <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
 })
+
+calc_abserrs <- function(df,...) {
+    for (i in list(...)) {
+        eval.parent(substitute(df[paste0(i,"_abserr_rel")] <- abs(df[paste0(i,"_modeled")] - df[i])/df[i]))
+        eval.parent(substitute(df[paste0(i,"_ripc_abserr_rel")] <- abs(df[paste0(i,"_ripc_modeled")] - df[i])/df[i]))
+    }
+}
+calc_abserrs(bench,"power_pkg","power_ram","power_cores")
+
+
 
 cat("IPC = "); print_eqn(sm_IPC)
 cat("P_pkg = "); print_eqn(sm_power)
@@ -254,8 +258,8 @@ cat("\n== Results for NPB bechmarks ==\n")
 cat(style("columns denoted with ' use real IPC values, not modeled ones\n\n","green"))
 
 metrics <- c("IPC","P_PKG","P_CORES","P_RAM","P_PKG'","P_CORES'","P_RAM'")
-metric_columns <- c("IPC_abserr_rel","power_abserr_rel","power_abserr_rel_cores","power_abserr_rel_ram",
-                "power_abserr_rel_ripc","power_abserr_rel_cores_ripc","power_abserr_rel_ram_ripc")
+metric_columns <- c("IPC_abserr_rel","power_pkg_abserr_rel","power_cores_abserr_rel","power_ram_abserr_rel",
+                "power_pkg_ripc_abserr_rel","power_cores_ripc_abserr_rel","power_ram_ripc_abserr_rel")
 
 print_eval <- function(dataframe,benches,metrics,metric_columns) {
     cat('Datapoints as basis for models and evaluation: ',nrow(dataframe),"\n")
@@ -275,7 +279,7 @@ print_eval <- function(dataframe,benches,metrics,metric_columns) {
     }
     cat(sprintf("%-*s:",prstr,"MAPE (all)"))
     for (m in metric_columns) {
-        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(bench[[m]]))),thresholds,colors,FALSE))
+        cat(" ",colorprint(sprintf("%7s",sprintf("%2.4f",mean(dataframe[[m]]))),thresholds,colors,FALSE))
     }
     cat("\n")
 }
@@ -286,19 +290,15 @@ print_eval(bench,benches,metrics,metric_columns)
 eris <- within(eris, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel <- abs(power_modeled - power_pkg) / power_pkg
-    power_modeled_ripc <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ripc <- abs(power_modeled_ripc - power_pkg) / power_pkg
-    power_modeled_ram <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ram <- abs(power_modeled_ram - power_ram) / power_ram
-    power_modeled_ram_ripc <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_abserr_rel_ram_ripc <- abs(power_modeled_ram_ripc - power_ram) / power_ram
-    power_modeled_cores <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_abserr_rel_cores <- abs(power_modeled_cores - power_cores) / power_cores
-    power_modeled_cores_ripc <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_abserr_rel_cores_ripc <- abs(power_modeled_cores_ripc - power_cores) / power_cores
+    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_ram_modeled <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_ram_ripc_modeled <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
 })
+calc_abserrs(eris,"power_pkg","power_ram","power_cores")
+
 
 cat("\n== Results for ERIS ==\n")
 
