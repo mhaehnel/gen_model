@@ -225,12 +225,6 @@ while read bench clients interval factor requests; do
 
                 echo -n "@$(($freq/1000))"
 
-                elab frequency $(($freq/1000)) >&3
-
-                if [ $ht == disable ]; then
-                    elab ht disable >&3
-                fi
-
                 file_ts=$(date +%Y_%m_%d-%H_%M_%S)
                 perf_counter_out_tmp="$(mktemp)"
                 perf_counter_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.ctr.csv"
@@ -248,8 +242,7 @@ while read bench clients interval factor requests; do
                 curdir=$(pwd)
                 cd $ERIS_DIR
 
-                taskset -c $taskset_cpus \
-                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
+                perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
                     perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     build/eris 1>/dev/null 2>&1 &
                 pid_ERIS=
@@ -257,7 +250,12 @@ while read bench clients interval factor requests; do
                     pid_ERIS=$(pidof eris)
                 done
 
-                $ERIS_CTRL_DIR/eris-bench run --user=euf --passwd=euf --wait --csv --out=$eris_ctrl_out --duration=$MIN_RUNTIME --mode=timed --factor=$factor --clients=$clients --interval=$interval --requests=$requests $bench
+                $ERIS_CTRL_DIR/eris-bench run --user=euf --passwd=euf \
+                    --wait --csv --out=$eris_ctrl_out \
+                    --worker=$taskset_cpus --frequency=$(($freq/1000)) \
+                    --duration=$MIN_RUNTIME \
+                    --mode=clients --factor=$factor --clients=$clients --interval=$interval --requests=$requests $bench
+
                 kill "$pid_ERIS"
 
                 cd $curdir
@@ -274,18 +272,14 @@ while read bench clients interval factor requests; do
 
                 # We are done with the benchmark -- parse the perf output file
                 $BASE_DIR/parse_csv_eris.py $bench $ht $c $freq $perf_counter_out $perf_energy_out $eris_ctrl_out -o $CSV --append
-
-                if [ $ht == disable ]; then
-                    elab ht enable >&3
-                fi
             done
         done
     done
     echo -ne "\n"
 done <<< $(cat << EOF
-deduplication-indexed 4 1000 500 1000
-deduplication-scan 4 1000 500 10
-tatp 4 1000 10 135
+deduplication-indexed 10 1000 10 100
+deduplication-scan 10 1000 10 100
+tatp 5 1000 10 10
 EOF
 )
 #ssb 1 1000 1 1
