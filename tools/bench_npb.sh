@@ -76,8 +76,12 @@ fi
 # Setup the script's internals
 all_freqs=( $(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies) )
 cpu_gov=$(< /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+total_cpus=$(find /sys/devices/system/cpu -name 'cpu[0-9]*' -print | wc -l)
 nr_cpus=$(grep "cpu cores" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
 nr_hts=$(grep "siblings" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed 's/ //g')
+nr_sockets=$(($total_cpus / $nr_hts))
+
+ht_sibling=$(cut -d, -f2 /sys/devices/system/cpu/cpu0/topology/thread_siblings_list)
 
 [ $FREQ_STEPS -ge 2 ] || { echo >&2 "Must use at least 2 frequency steps (current: FREQ_STEPS=$FREQ_STEPS)"; exit 1; }
 [ $FREQ_STEPS -le ${#all_freqs[@]} ] || { echo >&2 "Must use less frequency steps than available frequencies (current: FREQ_STEPS=$FREQ_STEPS, frequencies=${#all_freqs[@]})"; exit 1; }
@@ -176,7 +180,7 @@ cpus="$cpus $nr_cpus"
 if [ $ASK -eq 1 ]; then
     cat << EOF
 Detected system configuration:
-CPUs: $nr_cpus ($nr_hts HTs)
+CPUs: $total_cpus ($nr_sockets x $nr_cpus x $(($nr_hts / $nr_cpus)) [Sockets x CPUs x HTs])
 Frequencies: $min_freq-$max_freq (@${cpu_gov}) {${all_freqs[@]}}
 Turbo: $(if [ "x$turbo_freq" == "x" ]; then echo "disabled"; else echo $turbo_freq; fi)
 
@@ -246,7 +250,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                         taskset_cpus="0-$(($cpu-1))"
                         c=$cpu
                     else
-                        taskset_cpus="0-$(($cpu-1)),$nr_cpus-$(($nr_cpus+$cpu-1))"
+                        taskset_cpus="0-$(($cpu-1)),$ht_sibling-$(($ht_sibling+$cpu-1))"
                         c=$(($cpu*2))
                     fi
 
