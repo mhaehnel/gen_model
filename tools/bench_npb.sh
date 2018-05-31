@@ -166,7 +166,7 @@ if [ $TURBO_BOOST -eq 1 ]; then
     fi
 fi
 
-cpu_step=$(($nr_cpus/$CPU_STEPS))
+cpu_step=$((($nr_cpus - 1)/($CPU_STEPS - 1)))
 cpu=1
 cpus="1"
 if [ $cpu_step -gt 0 ]; then
