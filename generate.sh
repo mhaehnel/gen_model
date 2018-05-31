@@ -17,21 +17,30 @@ make -C "${BASE_DIR}/benchmarks" || { echo >&2 "Something went wrong when buildi
 # Measure all the necessary data
 echo "Run benchmarks"
 
-export BENCH_DIR="${BASE_DIR}/benchmarks/NPB3.3.1/NPB3.3-OMP/bin"
+export NPB_DIR="${BASE_DIR}/benchmarks/NPB3.3.1/NPB3.3-OMP/bin"
+export ERIS_DIR=${ERIS_DIR:-/root/eris}
+export ERIS_CTRL_DIR=${ERIS_CTRL_DIR:-/root/eris-ctrl}
 
-export PERF_DIR="${PERF_DIR:-${BASE_DIR}/perf_data}"
-export CSV="${CSV:-${BASE_DIR}/bench_data.csv}"
+export NPB_DATA_DIR=${NPB_DATA_DIR:-"${BASE_DIR}/npb_data"}
+export NPB_CSV=${NPB_CSV:-"${BASE_DIR}/npb_bench.csv"}
+export ERIS_DATA_DIR=${ERIS_DATA_DIR:-"${BASE_DIR}/eris_data"}
+export ERIS_CSV=${ERIS_CSV:-"${BASE_DIR}/eris_bench.csv"}
+
 export RATE_MS=${RATE_MS:-1000}
-BENCH_ERROR_LOG=${BENCH_ERROR_LOG:-bench.log}
+
+NPB_ERROR_LOG=${NPB_ERROR_LOG:-npb.log}
+ERIS_ERROR_LOG=${NPB_ERROR_LOG:-eris.log}
 
 # Make sure that the system is prepared accordingly
 sudo $BASE_DIR/tools/disable_energy_automatisms.sh
 
-$BASE_DIR/tools/bench.sh 2>$BENCH_ERROR_LOG || { echo >&2 "Something went wrong when running the benchmarks"; exit 1; }
+# Run the benchmarks
+$BASE_DIR/tools/bench_npb.sh 2>$NPB_ERROR_LOG || { echo >&2 "Something went wrong when running the NPB benchmarks"; exit 1; }
+$BASE_DIR/tools/bench_eris.sh 2>$ERIS_ERROR_LOG || { echo >&2 "Something went wrong when running the ERIS benchmarks"; exit 1; }
 
 # Generate the models
 echo "Generate models"
 
 export R_LIBS_USER=~/.local/lib64/R/library
 mkdir -p ${R_LIBS_USER}
-Rscript "${BASE_DIR}/tools/analysis.R" $CSV
+Rscript "${BASE_DIR}/tools/analysis.R" $NPB_CSV $ERIS_CSV

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 ## Global Variables
+# Whether or not we should ask before starting the benchmarks
+ASK=${ASK:-1}
+
 # Whether or not turbo boost should be measured too
 TURBO_BOOST=${TURBO_BOOST:-0}
 
@@ -26,14 +29,15 @@ MIN_RUNTIME=${MIN_RUNTIME:-60}
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # The directory where the intermediate output files of perf should be saved
-PERF_DIR=${PERF_DIR:-perf_csv}
+DATA_DIR=${NPB_DATA_DIR:-npb_data}
 
 # The file where the final CSV output should be saved to
-CSV=${CSV:-bench.csv}
+CSV=${NPB_CSV:-npb_bench.csv}
 
 # The directories where the script and the benchmark files are located
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
-BENCH_DIR=${BENCH_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
+
+NPB_DIR=${NPB_DIR:-"$BASE_DIR/NPB3.3.1/NPB3.3-OMP/bin"}
 
 # The additional events that we must count
 INSTR_EVENT=${E_INSTR:-instructions}
@@ -169,7 +173,8 @@ if [ $cpu_step -gt 0 ]; then
 fi
 cpus="$cpus $nr_cpus"
 
-cat << EOF
+if [ $ASK -eq 1 ]; then
+    cat << EOF
 Detected system configuration:
 CPUs: $nr_cpus ($nr_hts HTs)
 Frequencies: $min_freq-$max_freq (@${cpu_gov}) {${all_freqs[@]}}
@@ -182,23 +187,24 @@ Frequencies ($FREQ_STEPS steps): ${freqs[@]}
 Measurement rate: $RATE_MS ms
 EOF
 
-read -en1 -p "Continue? [Y/n] " answer
-case $answer in
-    N|n)
-        exit 0
-        ;;
-    Y|y|'')
-        ;;
-    *)
-        echo "Huh? Aborting";
-        exit 1
-        ;;
-esac
+    read -en1 -p "Continue? [Y/n] " answer
+    case $answer in
+        N|n)
+            exit 0
+            ;;
+        Y|y|'')
+            ;;
+        *)
+            echo "Huh? Aborting";
+            exit 1
+            ;;
+    esac
+fi
 
 # Fully abort the script upon CTRL-C
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM
 
-mkdir -p $PERF_DIR
+mkdir -p $DATA_DIR
 
 exec 3<> $ELAB_LOG
 elab ht enable >&3
@@ -208,7 +214,7 @@ echo -ne "\nStart benchmarking\n"
 for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
     echo -n "$bench: "
 
-    bin="$BENCH_DIR/${bench}.x"
+    bin="$NPB_DIR/${bench}.x"
 
     for ht in enable disable; do
         if [ $ht == enable ]; then
@@ -233,8 +239,8 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
 
                 while (($(date +%s) - $start_ts < $MIN_RUNTIME)); do
                     perf_counter_out_tmp="$(mktemp)"
-                    perf_counter_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
-                    perf_energy_out="$PERF_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
+                    perf_counter_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.ctr.csv"
+                    perf_energy_out="$DATA_DIR/${bench}.${ht}.${cpu}.${freq}.${file_ts}.${iter}.energy.csv"
 
                     if [ $ht == disable ]; then
                         taskset_cpus="0-$(($cpu-1))"
@@ -261,7 +267,7 @@ for bench in bt.A cg.B dc.A ep.B ft.C is.C lu.B mg.C sp.B ua.A; do
                     sed -i "s#${AVX_EVENT}#avx-events#g" $perf_counter_out
 
                     # We are done with the benchmark -- parse the perf output file
-                    $BASE_DIR/parse_csv.py $bench $ht $c $freq $perf_counter_out $perf_energy_out -o $CSV --append
+                    $BASE_DIR/parse_csv_npb.py $bench $ht $c $freq $perf_counter_out $perf_energy_out -o $CSV --append
 
                     iter=$(($iter + 1))
                 done

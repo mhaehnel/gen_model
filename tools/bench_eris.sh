@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 ## Global Variables
+# Whether or not we should ask before starting the benchmarks
+ASK=${ASK:-1}
+
 # Whether or not turbo boost should be measured too
 TURBO_BOOST=${TURBO_BOOST:-0}
 
@@ -26,10 +29,10 @@ MIN_RUNTIME=${MIN_RUNTIME:-30}
 ELAB_LOG=${ELAB_LOG:-/dev/null}
 
 # The directory where the intermediate output files of perf should be saved
-DATA_DIR=${DATA_DIR:-"$(pwd)/eris_data"}
+DATA_DIR=${ERIS_DATA_DIR:-"$(pwd)/eris_data"}
 
 # The file where the final CSV output should be saved to
-CSV=${CSV:-"$(pwd)/eris_bench.csv"}
+CSV=${ERIS_CSV:-"$(pwd)/eris_bench.csv"}
 
 # The directories where the script and the benchmark files are located
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" && pwd )"
@@ -171,7 +174,8 @@ if [ $cpu_step -gt 0 ]; then
 fi
 cpus="$cpus $nr_cpus"
 
-cat << EOF
+if [ $ASK -eq 1 ]; then
+    cat << EOF
 Detected system configuration:
 CPUs: $nr_cpus ($nr_hts HTs)
 Frequencies: $min_freq-$max_freq (@${cpu_gov}) {${all_freqs[@]}}
@@ -184,18 +188,19 @@ Frequencies ($FREQ_STEPS steps): ${freqs[@]}
 Measurement rate: $RATE_MS ms
 EOF
 
-read -en1 -p "Continue? [Y/n] " answer
-case $answer in
-    N|n)
-        exit 0
-        ;;
-    Y|y|'')
-        ;;
-    *)
-        echo "Huh? Aborting";
-        exit 1
-        ;;
-esac
+    read -en1 -p "Continue? [Y/n] " answer
+    case $answer in
+        N|n)
+            exit 0
+            ;;
+        Y|y|'')
+            ;;
+        *)
+            echo "Huh? Aborting";
+            exit 1
+            ;;
+    esac
+fi
 
 # Fully abort the script upon CTRL-C
 trap "echo Aborting!; exit 0;" SIGINT SIGTERM

@@ -109,7 +109,7 @@ for l in ctr_lines:
     values[-1][name] = value
 
 # Next read in the RAPL counter values and try to match them with the performance counters
-MAX_DIFF = 0.02      # The maximum difference in the time stamps to still be counted equal (seconds)
+MAX_DIFF = 0.03      # The maximum difference in the time stamps to still be counted equal (seconds)
 last_val = 0
 
 for l in energy_lines:
