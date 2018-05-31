@@ -29,7 +29,7 @@ export ERIS_CSV=${ERIS_CSV:-"${BASE_DIR}/eris_bench.csv"}
 export RATE_MS=${RATE_MS:-1000}
 
 NPB_ERROR_LOG=${NPB_ERROR_LOG:-npb.log}
-ERIS_ERROR_LOG=${NPB_ERROR_LOG:-eris.log}
+ERIS_ERROR_LOG=${ERIS_ERROR_LOG:-eris.log}
 
 # Make sure that the system is prepared accordingly
 sudo $BASE_DIR/tools/disable_energy_automatisms.sh
