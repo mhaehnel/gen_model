@@ -30,26 +30,45 @@ colorprint <- function(val, thresholds, colors, greater = TRUE) {
     return(val)
 }
 
-print_eqn <- function(sum, prefix = "") {
+#Check if values are somewhat constant. Output relative stddev
+vstats <- function(data,name=substitute(name),show=TRUE) {
+    if (show) {
+        cat("Value statistics:",name,"MIN:",min(data))
+        cat(" MAX: ",max(data),"MEAN:",mean(data),"MEDIAN:",median(data),"STDEV:",sd(data)," (",sd(data)/mean(data)*100,"%)\n")
+    }
+    if (mean(data) == 0) {
+            return(0)
+    } else {
+        return(sd(data)/mean(data))
+    }
+}
+
+print_eqn <- function(sum, prefix = "", mape=NA, returnResult=FALSE) {
+    ret <- ""
     for (r in rownames(coef(sum))[2:length(rownames(coef(sum)))]) {
-        cat(coef(sum)[r,"Estimate"])
+        ret <- paste0(ret,coef(sum)[r,"Estimate"])
         for (prod in strsplit(r,":")[[1]]) {
-            cat(" * ")
+            ret <- paste0(ret," * ")
             if (substr(prod,1,4) == "poly") {
                 elem <- strsplit(sub("poly\\(([^,]+), [^\\)]+\\)([0-9]*)","\\1,\\2",prod, perl=TRUE),",")[[1]]
-                cat(prefix,elem[1],sep="")
-                cat(ifelse(elem[2] > 1,paste("**",elem[2],sep=""),""))
+                ret <- paste0(ret,prefix,elem[1])
+                ret <- paste0(ret,ifelse(elem[2] > 1,paste("**",elem[2],sep=""),""))
             } else {
-                cat(prefix,prod,sep="")
+                ret <- paste0(ret,prefix,prod)
             }
         }
-        cat(" + ",sep="")
+        ret <- paste0(ret," + ")
     }
-    cat(coef(sum)["(Intercept)","Estimate"])
+    ret <- paste0(ret,coef(sum)["(Intercept)","Estimate"])
 
     colors = c("green","yellow","white","magenta","red")
     thresholds = c(0.9,0.8,0.7,0.6,0.0)
-    cat(" [R² =",colorprint(sum$adj.r.squared,thresholds,colors,TRUE),"]\n")
+    cat(ret," [R² =",colorprint(sum$adj.r.squared,thresholds,colors,TRUE))
+    if (! is.na(mape)) {
+        cat(", MAPE =",colorprint(mape,thresholds=c(0.05,0.07,0.1,0.15,1.0),colors,FALSE))
+    }
+    cat("]\n")
+    if (returnResult) return(ret)
 }
 
 solve_eqn <- function(sum,...) {
@@ -78,19 +97,20 @@ solve_eqn <- function(sum,...) {
 }
 
 # Main
-args = commandArgs(trailingOnly=TRUE)
+args <- commandArgs(trailingOnly=TRUE)
 if (length(args) < 2) {
     args[2] = "eris.csv"
 }
-if (length(args) < 1) {
+if (length(args) < 1 || is.na(args[1])) {
     args[1] = "bench.csv"
 }
-
 
 # Readin the data
 bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 eris <- read_delim(args[2], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
+
+mape_threshold <- Sys.getenv("MAPE_THRESHOLD",unset=0.05)
 
 pre <- NROW(bench)
 if (Sys.getenv("ERIS_MERGE",unset="N") != "N") {
@@ -182,23 +202,24 @@ eris <- within(eris, {
     power_ram <- `power/energy-ram/`/`t_diff`
     power_cores <- `power/energy-cores/`/`t_diff`
     power_pkg <- `power/energy-pkg/`/`t_diff`
+    tps <- `Tasks.Finished`/`t_diff`
+    ipt <- `Tasks.Finished`/instructions
 })
+
 
 # Generate the models
 m_IPC <- lm(IPC ~
-                poly(memory_heaviness,2,raw=TRUE)*cpus*freq +
-                poly(cache_heaviness,2,raw=TRUE)*cpus*freq +
-                poly(compute_heaviness,2,raw=TRUE)*cpus*freq +
-                poly(avx_heaviness,2,raw=TRUE)*cpus*freq +
-#                poly(freq,2,raw=TRUE) +
-#                poly(cpus,2,raw=TRUE) +
-                ht,
-            data=bench)
+#Complex Model. Uncomment to use            
+                poly(memory_heaviness,2,raw=TRUE)*cpus*freq*ht +
+                poly(cache_heaviness,2,raw=TRUE)*cpus*freq*ht +
+                poly(compute_heaviness,2,raw=TRUE)*cpus*freq*ht +
+                poly(avx_heaviness,2,raw=TRUE)*cpus*freq*ht 
+            ,data=bench)
 sm_IPC <- summary(m_IPC)
-print(sm_IPC)
+#print(sm_IPC)
 
 m_power_cores <- lm(power_cores ~
-                nomemory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC, 
+                nomemory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC*avx_heaviness*compute_heaviness#*cache_heaviness
 #                avx_heaviness*freq*cpus
 #                IPC +
 #                poly(freq,3,raw=TRUE) +
@@ -206,34 +227,34 @@ m_power_cores <- lm(power_cores ~
 #                ht,
             ,data=bench)
 sm_power_cores <- summary(m_power_cores)
-print(sm_power_cores)
+#print(sm_power_cores)
 
 m_power_ram <- lm(power_ram ~
-                memory_heaviness*IPC *
+                poly(memory_heaviness,2,raw=TRUE)*IPC *
                  freq*cpus
             ,data=bench)
 sm_power_ram <- summary(m_power_ram)
-print(sm_power_ram)
+#print(sm_power_ram)
 
 m_power <- lm(power_pkg ~
-                memory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC 
+                memory_heaviness*poly(freq,2,raw=TRUE)*poly(cpus,2,raw=TRUE)*IPC*avx_heaviness*compute_heaviness#*cache_heaviness
 #                poly(freq,3,raw=TRUE) +
 #                cpus# +
 #                ht
             ,data=bench)
 sm_power <- summary(m_power)
-print(sm_power)
+#print(sm_power)
 
 #Solve it
 bench <- within(bench, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
+    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
     power_ram_modeled <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
     power_ram_ripc_modeled <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness)
+    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness)
 })
 
 calc_abserrs <- function(df,...) {
@@ -246,10 +267,10 @@ calc_abserrs(bench,"power_pkg","power_ram","power_cores")
 
 
 
-cat("IPC = "); print_eqn(sm_IPC)
-cat("P_pkg = "); print_eqn(sm_power)
-cat("P_ram = "); print_eqn(sm_power_ram)
-cat("P_cores = "); print_eqn(sm_power_cores)
+cat("IPC = "); print_eqn(sm_IPC,mape=mean(bench$IPC_abserr_rel))
+cat("P_pkg = "); print_eqn(sm_power,mape=mean(bench$power_pkg_ripc_abserr_rel))
+cat("P_ram = "); print_eqn(sm_power_ram,mape=mean(bench$power_ram_ripc_abserr_rel))
+cat("P_cores = "); print_eqn(sm_power_cores,mape=mean(bench$power_cores_ripc_abserr_rel))
 
 colors = c("green","yellow","white","magenta","red")
 thresholds=c(0.05,0.07,0.1,0.15,1.0)
@@ -290,18 +311,84 @@ print_eval(bench,benches,metrics,metric_columns)
 eris <- within(eris, {
     IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
-    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
+    power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
+    power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
     power_ram_modeled <- solve_eqn(sm_power_ram, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
     power_ram_ripc_modeled <- solve_eqn(sm_power_ram, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness)
-    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
-    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness)
+    power_cores_modeled <- solve_eqn(sm_power_cores, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness)
+    power_cores_ripc_modeled <- solve_eqn(sm_power_cores, IPC=IPC, freq=freq, ht=ht, cpus=cpus,nomemory_heaviness=nomemory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness)
 })
 calc_abserrs(eris,"power_pkg","power_ram","power_cores")
 
 
 cat("\n== Results for ERIS ==\n")
+vmetrics <- c("memory","avx","cache","compute","nomemory","branch")
+
+prstr <- max(nchar(benches),nchar("heaviness stableness"))
+cat("heaviness stddev (rel)",rep(" ",prstr+2-nchar("heaviness stddev (rel)")),sep="")
+for (m in vmetrics) {
+    cat(sprintf(" %-10s",m))
+}
+cat("ipt\n")
+eris_model <- data.frame(matrix(ncol=length(vmetrics)+1,nrow=0))
+colnames(eris_model) <- c(paste0(vmetrics,"_heaviness"),"ipt")
+
+for (b in eris_benches) {
+    cat(sprintf("%-*s:",prstr,b))
+    for (m in vmetrics)  {
+        vals <- sqldf(paste0('select ',m,'_heaviness as v from eris where bench="',b,'"'))$v
+        stats <- vstats(vals,m,show=FALSE)
+        str <- colorprint(sprintf("%9s",sprintf("%2.4f",stats)),thresholds,colors,FALSE)
+        if (stats < mape_threshold) {
+            cat(" ",underline(str))
+            eris_model[b,paste0(m,"_heaviness")] = mean(vals)
+        } else {
+            cat(" ",str)
+        }
+    }
+    vals <- sqldf(paste0('select ipt as v from eris where bench="',b,'"'))$v
+    stats <- vstats(vals,"ipt",show=FALSE)
+    str <- colorprint(sprintf("%9s",sprintf("%2.4f",stats)),thresholds,colors,FALSE)
+    if (stats < mape_threshold) {
+        cat(" ",underline(str))
+        eris_model[b,"ipt"] = mean(vals)
+    } else {
+        cat(" ",sprintf("%9s",str))
+    }
+    cat("\n")
+}
+
+for (b in eris_benches) {
+    data <- sqldf(paste0('select * from eris where bench = "',b,'"'))
+    for (m in c(paste0(vmetrics,"_heaviness"),"ipt")) {
+#    for (m in c("memory_heaviness","avx_heaviness","cache_heaviness")) {
+        if (is.na(eris_model[b,m])) {
+            if (min(data[[m]]) == 0 && max(data[[m]]) == 0) {
+                cat(paste0(b,":",m," = ",style("not applicable. No such instructions","red")),"\n")
+            } else if (max(data[[m]] < 1e-10)) {
+                cat(paste0(b,":",m," = ",style("not applicable. Only trace amounts of such instructions (less than 1e-10 per instruction). Using as 0","red")),"\n")
+                eris_model[b,m] <- 0
+            } else {
+                sm <- summary(lm(get(m) ~ poly(cpus,2,raw=TRUE),data=data))
+                data <- within(data,modeled <- solve_eqn(sm, cpus=cpus))
+                mape <- mean(abs(data$modeled-data[[m]])/data[[m]])
+                cat(paste0(b,":",m," = ")); ret <- print_eqn(sm,mape=mape,returnResult=TRUE)
+                if (mape < mape_threshold) {
+                    eris_model[b,m] <- ret
+                }
+            }
+        }
+    }
+}
 
 print_eval(eris,eris_benches,metrics,metric_columns)
 
-#write.csv(bench, "r_data.csv")
+cat("Eris model parameters:\n",rep("=",20),sep="","\n")
+for (n in rownames(eris_model)) {
+    cat("\n")
+    print(t(eris_model[n,]))
+}
+#print(transform(eris_model))
+
+
+write.csv(bench, "r_data.csv")
