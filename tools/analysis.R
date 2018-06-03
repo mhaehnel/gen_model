@@ -207,7 +207,7 @@ eris <- within(eris, {
     power_cores <- `power/energy-cores/`/`t_diff`
     power_pkg <- `power/energy-pkg/`/`t_diff`
     tps <- `Tasks.Finished`/`t_diff`
-    ipt <- `Tasks.Finished`/instructions
+    ipt <- instructions/`Tasks.Finished`
 })
 
 
