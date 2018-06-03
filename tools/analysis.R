@@ -411,6 +411,7 @@ for (n in rownames(eris_model)) {
 
 
 write.csv(bench, "r_data.csv")
+write.csv(eris, "r_eris_data.csv")
 
 cat0("Writing Hardware Model to ",style("hardware.py","green"),"\n")
 
