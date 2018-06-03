@@ -39,4 +39,4 @@ echo "Plotting: ${plot_cmd}"
 (
 	head -1 ${FILE} | sed -e s/\"//g;
 	[ "#$filter" == "#" ] && tail +2 $FILE || awk "$filter" $FILE
-) | gnuplot -e "set datafile separator comma; set terminal dumb size 170,40; plot '<cat' using ${plot_cmd}"
+) | gnuplot -e "set datafile separator comma; set terminal dumb ansi size $(tput cols),$(tput lines); plot '<cat' using ${plot_cmd}"
