@@ -43,7 +43,7 @@ vstats <- function(data,name=substitute(name),show=TRUE) {
     }
 }
 
-print_eqn <- function(sum, prefix = "", mape=NA, returnResult=FALSE) {
+print_eqn <- function(sum, prefix = "", mape=NA, returnResult=FALSE, statistics=TRUE) {
     ret <- ""
     for (r in rownames(coef(sum))[2:length(rownames(coef(sum)))]) {
         ret <- paste0(ret,coef(sum)[r,"Estimate"])
@@ -63,11 +63,15 @@ print_eqn <- function(sum, prefix = "", mape=NA, returnResult=FALSE) {
 
     colors = c("green","yellow","white","magenta","red")
     thresholds = c(0.9,0.8,0.7,0.6,0.0)
-    cat(ret," [R² =",colorprint(sum$adj.r.squared,thresholds,colors,TRUE))
-    if (! is.na(mape)) {
-        cat(", MAPE =",colorprint(mape,thresholds=c(0.05,0.07,0.1,0.15,1.0),colors,FALSE))
-    }
-    cat("]\n")
+	if (statistics) {
+		cat(ret," [R² =",colorprint(sum$adj.r.squared,thresholds,colors,TRUE))
+	    if (! is.na(mape)) {
+	        cat(", MAPE =",colorprint(mape,thresholds=c(0.05,0.07,0.1,0.15,1.0),colors,FALSE))
+    	}
+	    cat("]\n")
+	} else {
+		cat(ret)
+	}
     if (returnResult) return(ret)
 }
 
@@ -305,6 +309,21 @@ print_eval <- function(dataframe,benches,metrics,metric_columns) {
     cat("\n")
 }
 
+print_params <- function(model) {
+    rns <- rownames(attr(model$terms,"factors"))[c(-1)]
+	ret <- ""
+	for (rn in rns) {
+		if (substr(rn,1,4) == "poly") {
+			 elem <- strsplit(sub("poly\\(([^,]+), [^\\)]+\\)","\\1",rn, perl=TRUE),",")[[1]]
+			 ret <- paste0(ret,elem[1],", ")
+		 } else {
+			 ret <- paste0(ret,rn,", ")
+		}
+	}
+	ret <- substr(ret,1,nchar(ret)-2)
+	cat(ret)
+}
+
 print_eval(bench,benches,metrics,metric_columns)
 
 # Solve it for eris
@@ -392,3 +411,46 @@ for (n in rownames(eris_model)) {
 
 
 write.csv(bench, "r_data.csv")
+
+cat0("Writing Hardware Model to ",style("hardware.py","green"),"\n")
+
+sink("hardware.py")
+create_lambda <- function(model, name, classMember=FALSE) {
+	cat(name,"= lambda "); print_params(model); cat(": "); 
+	if (classMember) cat("self, ")
+	print_eqn(summary(model),statistics=FALSE); cat("\n")
+}
+
+create_lambda(m_IPC,"IPC")
+create_lambda(m_power,"P_PKG")
+create_lambda(m_power_cores,"P_Cores")
+create_lambda(m_power_ram,"P_Ram")
+sink()
+
+cat0("Writing Eris Model to ",style("eris.py","green"),"\n")
+sink("eris.py")
+cat("class Eris:\n\n")
+cat("\tdef __init__(self,cpus):\n")
+cat("\t\tself.cpus = cpus\n\n")
+cat("\tdef benchmarks(self,name):\n")
+first <- TRUE
+for (b in rownames(eris_model)) {
+    if (first) {
+        cat("\t\t")
+        first=FALSE
+    } else {
+        cat("\t\tel")
+    }
+	cat0("if (name == \"",b,"\"):\n")
+    cat0("\t\t\treturn {\n")
+	for (m in colnames(eris_model)) {
+		if (grepl("cpus",eris_model[b,m],fixed=TRUE)) {
+			cat0("\t\t\t\t\"",m,"\": lambda:",gsub("cpus","self.cpus",eris_model[b,m]),",\n")
+		} else {
+			cat0("\t\t\t\t\"",m,"\": lambda:",eris_model[b,m],",\n")
+		}
+	}
+	cat("\t\t\t}\n")
+}
+sink()
+cat0("We are done. All are happy :)\n",style("BYE!\n","green"))
