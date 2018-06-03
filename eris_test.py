@@ -17,7 +17,7 @@ for c in ["deduplication-scan","deduplication-indexed","tatp"]:
                 p_pkg = hardware.P_PKG(memory_heaviness=params["memory_heaviness"](),IPC=ipc,freq=freq,avx_heaviness=params["avx_heaviness"](),compute_heaviness=params["compute_heaviness"](),cpus=cpus)
                 tps = (freq*1000)/(params["ipt"]()/ipc)
                 data.append({"bench":c,"freq": freq,"cpus":cpus, "ht":ht, "cores":cores,"ipc":ipc,"p_pkg": p_pkg,"tps": tps})
-    with open('modeled_'+c+'.csv','w') as output:
+    with open('csv/modeled_'+c+'.csv','w') as output:
         dict_writer = csv.DictWriter(output, data[0].keys())
         dict_writer.writeheader()
         dict_writer.writerows(data)
