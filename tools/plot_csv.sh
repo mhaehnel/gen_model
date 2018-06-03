@@ -5,9 +5,9 @@ shift
 FILTERS=( "$@" )
 
 printf "X Axis:\n==============\n"
-select x_value in $(head -1 ../r_data.csv | tr ',' '\n'); do [ -z $REPLY ] || break; done
+select x_value in $(head -1 ${FILE} | tr ',' '\n'); do [ -z $REPLY ] || break; done
 printf "Y Axis:\n==============\n"
-select y_value in $(head -1 ../r_data.csv | tr ',' '\n'); do [ -z $REPLY ] || break; done
+select y_value in $(head -1 ${FILE} | tr ',' '\n'); do [ -z $REPLY ] || break; done
 
 while true; do
 	echo -n "Specify filter or <RETURN> if done >" 
