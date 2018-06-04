@@ -22,7 +22,7 @@ class MatchError(RuntimeError):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-def find_perf_counter(values, last_best, current_ts, max_diff, force_next=False):
+def match_energy_counter(values, last_best, current_ts, max_diff, force_next=False):
     # Check if the one we used last time is still close enough
     if not force_next and abs(values[last_best]["ts"] - current_ts) < max_diff:
         return last_best
@@ -94,22 +94,29 @@ for l in ctr_lines:
     value = eles[1].strip()
 
     if last_ts == None:
-        values.append({ "ts" : ts, "t_diff" : ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
+        values.append({ "ts" : ts, "t_diff" : ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq, "skipping" : False })
         last_ts = ts
     elif ts != last_ts:
         if err_names:
             print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
             err_names = []
-            values = values[:-1]
-        values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
+            values[-1]["skipping"] = True
+
+        values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq, "skipping" : False })
         last_ts = ts
     if value == "<not counted>":
         err_names.append(name)
 
     values[-1][name] = value
 
+if err_names:
+    print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
+    err_names = []
+    values[-1]["skipping"] = True
+
+
 # Next read in the RAPL counter values and try to match them with the performance counters
-MAX_DIFF = 0.03      # The maximum difference in the time stamps to still be counted equal (seconds)
+MAX_DIFF = 0.499      # The maximum difference in the time stamps to still be counted equal (seconds)
 last_val = 0
 
 for l in energy_lines:
@@ -125,22 +132,31 @@ for l in energy_lines:
     ts = float(eles[0].strip())
     name = eles[3]
     value = float(eles[1].strip())
+    add = False
 
     try:
-        last_val = find_perf_counter(values, last_val, ts, MAX_DIFF)
+        last_val = match_energy_counter(values, last_val, ts, MAX_DIFF)
     except MatchError as e:
-        print("WARNING: " + str(e), file=sys.stderr)
+        print("WARNING for ctr {}: ".format(name) + str(e), file=sys.stderr)
         continue
 
     if name in values[last_val]:
         # Try if the next performance counter value might fit as well
         try:
-            last_val = find_perf_counter(values, last_val, ts, MAX_DIFF, True)
+            last_val = match_energy_counter(values, last_val, ts, MAX_DIFF, True)
         except MatchError as e:
-            print("WARNING: summing up duplicate energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
-            values[last_val][name] += value
-    else:
+            add = True
+
+    if values[last_val]["skipping"]:
+        print("WARNING for ctr {}: ignoring value because of skipping".format(name), file=sys.stderr)
+        continue
+
+    if not add:
         values[last_val][name] = value
+    else:
+        print("WARNING for ctr {}: summing up duplicate energy value at time {} (energy timestamp: {})".format(name, values[last_val]["ts"], ts), file=sys.stderr)
+        values[last_val][name] += value
+
 
 
 # Done parsing, create the output
@@ -175,7 +191,8 @@ if outfile:
 if needs_header:
     output_headers(columns, sep, out)
 for vals in values:
-    output_row(vals, columns, sep, out)
+    if not vals["skipping"]:
+        output_row(vals, columns, sep, out)
 
 if outfile:
     out.close()

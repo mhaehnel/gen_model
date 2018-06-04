@@ -76,21 +76,21 @@ try:
     with open(ctr_csv) as perffile:
         ctr_lines = perffile.read().splitlines()
 except IOError:
-    print("Can't open counter perf csv-file", file=sys.stderr)
+    print("Can't open counter perf csv-file: {}".format(ctr_csv), file=sys.stderr)
     sys.exit(1)
 
 try:
     with open(energy_csv) as perffile:
         energy_lines = perffile.read().splitlines()
 except IOError:
-    print("Can't open energy perf csv-file", file=sys.stderr)
+    print("Can't open energy perf csv-file: {}".format(energy_csv), file=sys.stderr)
     sys.exit(1)
 
 try:
     with open(eris_csv) as csvfile:
         eris_lines = csvfile.read().splitlines()
 except IOError:
-    print("Can't open eris csv-file", file=sys.stderr)
+    print("Can't open eris csv-file: {}".format(eris_csv), file=sys.stderr)
     sys.exit(1)
 
 # Parse the data from the perf csv-files
@@ -113,22 +113,29 @@ for l in ctr_lines:
     value = eles[1].strip()
 
     if last_ts == None:
-        values.append({ "ts" : ts, "t_diff" : ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
+        values.append({ "ts" : ts, "t_diff" : ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq, "skipping" : False })
         last_ts = ts
     elif ts != last_ts:
         if err_names:
             print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
             err_names = []
-            values = values[:-1]
-        values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq })
+            values[-1]["skipping"] = True
+
+        values.append({ "ts" : ts, "t_diff" : ts - last_ts, "bench" : bench, "ht" : ht, "cpus" : cpus, "freq" : freq, "skipping" : False })
         last_ts = ts
     if value == "<not counted>":
         err_names.append(name)
 
     values[-1][name] = value
 
+if err_names:
+    print("WARNING: uncounted value for {} in {} at time {} -- Skipping record".format(err_names,ctr_csv,last_ts),file=sys.stderr)
+    err_names = []
+    values[-1]["skipping"] = True
+
+
 # Next read in the RAPL counter values and try to match them with the performance counters
-MAX_DIFF = 0.03      # The maximum difference in the time stamps to still be counted equal (seconds)
+MAX_DIFF = 0.499    # The maximum difference in the time stamps to still be counted equal (seconds)
 last_val = 0
 
 for l in energy_lines:
@@ -144,11 +151,12 @@ for l in energy_lines:
     ts = float(eles[0].strip())
     name = eles[3]
     value = float(eles[1].strip())
+    add = False
 
     try:
         last_val = match_energy_counter(values, last_val, ts, MAX_DIFF)
     except MatchError as e:
-        print("WARNING: " + str(e), file=sys.stderr)
+        print("WARNING for ctr {}: ".format(name) + str(e), file=sys.stderr)
         continue
 
     if name in values[last_val]:
@@ -156,10 +164,18 @@ for l in energy_lines:
         try:
             last_val = match_energy_counter(values, last_val, ts, MAX_DIFF, True)
         except MatchError as e:
-            print("WARNING: summing up duplicate energy value at time {} (energy timestamp: {})".format(values[last_val]["ts"], ts), file=sys.stderr)
-            values[last_val][name] += value
-    else:
+            add = True
+
+    if values[last_val]["skipping"]:
+        print("WARNING for ctr {}: ignoring value because of skipping".format(name), file=sys.stderr)
+        continue
+
+    if not add:
         values[last_val][name] = value
+    else:
+        print("WARNING for ctr {}: summing up duplicate energy value at time {} (energy timestamp: {})".format(name, values[last_val]["ts"], ts), file=sys.stderr)
+        values[last_val][name] += value
+
 
 # Now match the eris values to the perf values
 eris_values = []
@@ -173,7 +189,11 @@ for l in eris_lines[1:]:
     try:
         last_val = match_eris_counter(values, last_val, ts)
     except MatchError as e:
-        print("WARNING: " + str(e), file=sys.stderr)
+        print("WARNING for ctr {}: ".format(name) + str(e), file=sys.stderr)
+
+    if values[last_val]["skipping"]:
+        print("WARNING for ctr {}: ignoring values because of skipping.".format(name), file=sys.stderr)
+        continue
 
     values[last_val][name] = value
     if not last_val in eris_values:
@@ -210,8 +230,8 @@ if outfile:
 # Create the output
 if needs_header:
     output_headers(columns, sep, out)
-for i,vals in enumerate(values):
-    if i in eris_values:
+for i, vals in enumerate(values):
+    if i in eris_values and not vals["skipping"]:
         output_row(vals, columns, sep, out)
 
 if outfile:
