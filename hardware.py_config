@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+class Hardware:
+	config = {
+		"cores": range(1,5),
+		"ht": [0,1],
+		"freq": range(800000,3600000,200000),
+	}

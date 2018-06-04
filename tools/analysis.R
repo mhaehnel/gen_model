@@ -415,9 +415,10 @@ write.csv(eris, "r_eris_data.csv")
 
 cat0("Writing Hardware Model to ",style("hardware.py","green"),"\n")
 
-sink("hardware.py")
+sink("models/hardware_model.py")
+writeLines(readLines('hardware.py_config'))
 create_lambda <- function(model, name, classMember=FALSE) {
-	cat(name,"= lambda "); print_params(model); cat(": "); 
+	cat0("\t",name,"= lambda "); print_params(model); cat(": "); 
 	if (classMember) cat("self, ")
 	print_eqn(summary(model),statistics=FALSE); cat("\n")
 }
@@ -429,7 +430,7 @@ create_lambda(m_power_ram,"P_Ram")
 sink()
 
 cat0("Writing Eris Model to ",style("eris.py","green"),"\n")
-sink("eris.py")
+sink("models/eris_model.py")
 cat("class Eris:\n\n")
 cat("\tdef __init__(self,cpus):\n")
 cat("\t\tself.cpus = cpus\n\n")
