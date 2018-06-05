@@ -214,16 +214,24 @@ eris <- within(eris, {
 # Generate the models
 m_IPC <- lm(IPC ~
 #Complex Model. Uncomment to use            
-                poly(memory_heaviness,2,raw=TRUE)*cpus*freq*ht +
-                poly(cache_heaviness,2,raw=TRUE)*cpus*freq*ht +
-                poly(compute_heaviness,2,raw=TRUE)*cpus*freq*ht +
-                poly(avx_heaviness,2,raw=TRUE)*cpus*freq*ht 
+                (poly(memory_heaviness,3,raw=TRUE) *
+                poly(compute_heaviness,3,raw=TRUE) +
+                poly(branch_heaviness,3,raw=TRUE) +
+                poly(cache_heaviness,3,raw=TRUE) +
+                poly(avx_heaviness,3,raw=TRUE)
+                )*cpus*freq*ht #+
+#                 poly(memory_heaviness,2,raw=TRUE)*
+#                 poly(cache_heaviness,2,raw=TRUE)*
+#                 poly(compute_heaviness,2,raw=TRUE)*
+#                 poly(avx_heaviness,2,raw=TRUE)*
+#                 poly(branch_heaviness,2,raw=TRUE)*cpus*freq*ht
+#                poly(branch_heaviness,2,raw=TRUE)*cpus*freq*ht 
             ,data=bench)
 sm_IPC <- summary(m_IPC)
 #print(sm_IPC)
 
 m_power_cores <- lm(power_cores ~
-                nomemory_heaviness*poly(freq,2,raw=TRUE)*cpus*IPC*avx_heaviness*compute_heaviness#*cache_heaviness
+                nomemory_heaviness*poly(freq,2,raw=TRUE)*cpus*poly(IPC,2,raw=TRUE)*avx_heaviness*compute_heaviness*ht#*cache_heaviness
 #                avx_heaviness*freq*cpus
 #                IPC +
 #                poly(freq,3,raw=TRUE) +
@@ -234,7 +242,7 @@ sm_power_cores <- summary(m_power_cores)
 #print(sm_power_cores)
 
 m_power_ram <- lm(power_ram ~
-                poly(memory_heaviness,2,raw=TRUE)*IPC *
+                poly(memory_heaviness,2,raw=TRUE)*IPC*ht *
                  freq*cpus
             ,data=bench)
 sm_power_ram <- summary(m_power_ram)
@@ -251,7 +259,7 @@ sm_power <- summary(m_power)
 
 #Solve it
 bench <- within(bench, {
-    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus, branch_heaviness=branch_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
     power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
     power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
@@ -328,7 +336,7 @@ print_eval(bench,benches,metrics,metric_columns)
 
 # Solve it for eris
 eris <- within(eris, {
-    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus)
+    IPC_modeled <- solve_eqn(sm_IPC, memory_heaviness=memory_heaviness, cache_heaviness=cache_heaviness, ht=ht, freq=freq, compute_heaviness=compute_heaviness, avx_heaviness=avx_heaviness, cpus=cpus, branch_heaviness=branch_heaviness)
     IPC_abserr_rel <- abs(IPC_modeled - IPC) / IPC
     power_pkg_modeled <- solve_eqn(sm_power, IPC=IPC_modeled, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
     power_pkg_ripc_modeled <- solve_eqn(sm_power, IPC=IPC, freq=freq, ht=ht, cpus=cpus,memory_heaviness=memory_heaviness,avx_heaviness=avx_heaviness,cache_heaviness=cache_heaviness,compute_heaviness=compute_heaviness,nomemory_heaviness=nomemory_heaviness)
@@ -423,8 +431,9 @@ sink()
 cat0("Writing Eris Model to ",style("eris.py","green"),"\n")
 sink("models/eris_model.py")
 cat("class Eris:\n\n")
-cat("\tdef __init__(self,cpus):\n")
-cat("\t\tself.cpus = cpus\n\n")
+cat("\tdef __init__(self,cpus,ht):\n")
+cat("\t\tself.cpus = cpus\n")
+cat("\t\tself.ht = ht\n\n")
 cat("\tdef benchmarks(self,name):\n")
 first <- TRUE
 for (b in rownames(eris_model)) {
@@ -438,7 +447,7 @@ for (b in rownames(eris_model)) {
     cat0("\t\t\treturn {\n")
 	for (m in colnames(eris_model)) {
 		if (grepl("cpus",eris_model[b,m],fixed=TRUE)) {
-			cat0("\t\t\t\t\"",m,"\": lambda:",gsub("cpus","self.cpus",eris_model[b,m]),",\n")
+			cat0("\t\t\t\t\"",m,"\": lambda:",gsub("ht","self.ht",gsub("cpus","self.cpus",eris_model[b,m])),",\n")
 		} else {
 			cat0("\t\t\t\t\"",m,"\": lambda:",eris_model[b,m],",\n")
 		}
