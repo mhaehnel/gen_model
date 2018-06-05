@@ -354,25 +354,16 @@ colnames(eris_model) <- c(paste0(vmetrics,"_heaviness"),"ipt")
 
 for (b in eris_benches) {
     cat(sprintf("%-*s:",prstr,b))
-    for (m in vmetrics)  {
-        vals <- sqldf(paste0('select ',m,'_heaviness as v from eris where bench="',b,'"'))$v
+    for (m in c(paste0(vmetrics,"_heaviness"),"ipt"))  {
+        vals <- sqldf(paste0('select ',m,' as v from eris where bench="',b,'"'))$v
         stats <- vstats(vals,m,show=FALSE)
         str <- colorprint(sprintf("%9s",sprintf("%2.4f",stats)),thresholds,colors,FALSE)
         if (stats < mape_threshold) {
             cat(" ",underline(str))
-            eris_model[b,paste0(m,"_heaviness")] = mean(vals)
+            eris_model[b,m] = mean(vals)
         } else {
             cat(" ",str)
         }
-    }
-    vals <- sqldf(paste0('select ipt as v from eris where bench="',b,'"'))$v
-    stats <- vstats(vals,"ipt",show=FALSE)
-    str <- colorprint(sprintf("%9s",sprintf("%2.4f",stats)),thresholds,colors,FALSE)
-    if (stats < mape_threshold) {
-        cat(" ",underline(str))
-        eris_model[b,"ipt"] = mean(vals)
-    } else {
-        cat(" ",sprintf("%9s",str))
     }
     cat("\n")
 }
