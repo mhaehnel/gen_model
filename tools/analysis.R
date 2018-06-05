@@ -241,7 +241,7 @@ sm_power_ram <- summary(m_power_ram)
 #print(sm_power_ram)
 
 m_power <- lm(power_pkg ~
-                memory_heaviness*poly(freq,2,raw=TRUE)*poly(cpus,2,raw=TRUE)*IPC*avx_heaviness*compute_heaviness#*cache_heaviness
+                memory_heaviness*poly(freq,2,raw=TRUE)*poly(cpus,2,raw=TRUE)*IPC*avx_heaviness*compute_heaviness*ht#*cache_heaviness
 #                poly(freq,3,raw=TRUE) +
 #                cpus# +
 #                ht
