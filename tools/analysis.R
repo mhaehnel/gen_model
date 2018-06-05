@@ -387,11 +387,21 @@ for (b in eris_benches) {
                 cat(paste0(b,":",m," = ",style("not applicable. Only trace amounts of such instructions (less than 1e-10 per instruction). Using as 0","red")),"\n")
                 eris_model[b,m] <- 0
             } else {
-                sm <- summary(lm(get(m) ~ poly(cpus,2,raw=TRUE),data=data))
-                data <- within(data,modeled <- solve_eqn(sm, cpus=cpus))
+                sm <- summary(lm(get(m) ~ poly(cpus,2,raw=TRUE)*ht,data=data))
+                data <- within(data,modeled <- solve_eqn(sm, cpus=cpus, ht=ht))
                 mape <- mean(abs(data$modeled-data[[m]])/data[[m]])
+                meanVal <- mean(data[[m]])
+                mapeMean <- mean(abs(meanVal - data[[m]])/data[[m]])
                 cat(paste0(b,":",m," = ")); ret <- print_eqn(sm,mape=mape,returnResult=TRUE)
-                if (mape < mape_threshold) {
+                cat("Comparing MAPE of model (",style(colorprint(sprintf("%9s",mape),thresholds,colors,FALSE)),")")
+                cat(" with MAPE when using mean (",style(colorprint(sprintf("%9s",mapeMean),thresholds,colors,FALSE)),"): ")
+                if (mapeMean <= mape) {
+                    if (mape > mape_threshold) cat(style("!! :( !! -> ","red"))
+                    cat("Mean wins:",colorprint(meanVal,thresholds,colors,FALSE),"\n")
+                    eris_model[b,m] <- meanVal
+                } else {
+                    if (mape > mape_threshold) cat(style("!! :( !! -> ","red"))
+                    cat("Model wins\n")
                     eris_model[b,m] <- ret
                 }
             }
