@@ -375,7 +375,7 @@ for (b in eris_benches) {
         if (is.na(eris_model[b,m])) {
             if (min(data[[m]]) == 0 && max(data[[m]]) == 0) {
                 cat(paste0(b,":",m," = ",style("not applicable. No such instructions","red")),"\n")
-            } else if (max(data[[m]] < 1e-10)) {
+            } else if (max(data[[m]]) < 1e-10) {
                 cat(paste0(b,":",m," = ",style("not applicable. Only trace amounts of such instructions (less than 1e-10 per instruction). Using as 0","red")),"\n")
                 eris_model[b,m] <- 0
             } else {
