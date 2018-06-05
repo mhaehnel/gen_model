@@ -114,7 +114,7 @@ bench <- read_delim(args[1], ";", escape_double = FALSE, trim_ws = TRUE, col_typ
 eris <- read_delim(args[2], ";", escape_double = FALSE, trim_ws = TRUE, col_types = cols(`cpu-cycles`="d", `cpu-cycles-ref`="d", instructions="d", `branch-events`="d", `cache-events`="d", `memory-events`="d", `avx-events`="d"))
 
 
-mape_threshold <- Sys.getenv("MAPE_THRESHOLD",unset=0.05)
+mape_threshold <- as.double(Sys.getenv("MAPE_THRESHOLD",unset=0.05))
 
 pre <- NROW(bench)
 if (Sys.getenv("ERIS_MERGE",unset="N") != "N") {
