@@ -26,9 +26,9 @@ with open(args.f, newline='') as f:
     reader = csv.DictReader(f)
     data = [row for row in reader]
     pareto = list()
-    print(';'.join(data[0].keys()))
+    print(','.join(data[0].keys()))
     for r in data:
         for d in data:
             if d != r and better(d,r): break;
         else:
-            print(';'.join(r.values()))
+            print(','.join(r.values()))
