@@ -58,6 +58,7 @@ arr_reverse() { declare ARR="$1[@]"; declare -ga $1="( `printf '%s\n' "${!ARR}" 
 
 # Check requirements for this script to work
 command -v elab >/dev/null 2>&1 || { echo >&2 "'elab' has to be installed"; exit 1; }
+command -v numactl >/dev/null 2>&1 || { echo >&2 "'numactl' has to be installed"; exit 1; }
 command -v perf >/dev/null 2>&1 || { echo >&2 "'perf' has to be installed"; exit 1; }
 perf list | grep "power/energy-cores" >/dev/null 2>&1 || { echo >&2 "need perf support to read RAPL counters"; exit 1; }
 
@@ -251,7 +252,8 @@ while read bench clients interval factor requests; do
                 curdir=$(pwd)
                 cd $ERIS_DIR
 
-                perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
+                numactl -m 0 \
+                    perf stat -a -e power/energy-cores/,power/energy-ram/,power/energy-pkg/ -I $RATE_MS -x \; -o "$perf_energy_out" \
                     perf stat -e $INSTR_EVENT,$CYCLE_EVENT,$CYCLE_REF_EVENT,$BRANCH_EVENT,$CACHE_EVENT,$MEMORY_EVENT,$AVX_EVENT -I $RATE_MS -x \; -o "$perf_counter_out_tmp" \
                     build/eris 1>/dev/null 2>&1 &
                 pid_ERIS=
